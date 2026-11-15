@@ -1,3 +1,4 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - apps/*
+  - packages/*
+storeDir: /Volumes/SanDisk SSD/Coding/AI Interview Platform/.pnpm-store
