@@ -42,12 +42,11 @@
 - [x] Linked `@interviewai/shared-types` into both `web` and `api`
 - [x] Verified full monorepo build with `turbo run build`
 - [x] Created environment configuration templates (`.env.example`) for apps
+- [x] Configured zero-footprint disk strategy: all pnpm tools, binaries, and package cache isolated on external SSD
+- [x] Connected NestJS to Supabase PostgreSQL 17.11 via TypeORM and verified live `/health` database query
 
 ### Pending Tasks in Phase 1
-- [ ] Set up local PostgreSQL database and connection test from NestJS
-- [ ] Set up local Redis or in-memory fallback for session/queue management
-- [ ] Connect NestJS to PostgreSQL using TypeORM with migration support
-- [ ] Verify end-to-end communication: Next.js frontend fetches health status from NestJS backend
+- [ ] Connect Next.js frontend to query backend `/health` endpoint to verify end-to-end frontend-to-backend communication
 - [ ] Verify root linting, formatting, and type-checking scripts across all packages
 
 ### Blockers
