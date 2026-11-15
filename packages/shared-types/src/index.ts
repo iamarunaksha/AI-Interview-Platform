@@ -11,72 +11,72 @@
 
 /** User account status */
 export enum UserStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-  SUSPENDED = 'suspended',
+  ACTIVE = "active",
+  INACTIVE = "inactive",
+  SUSPENDED = "suspended",
 }
 
 /** Professional domain the candidate is preparing for */
 export enum ProfessionalDomain {
-  SDE = 'sde',
-  SAP = 'sap',
+  SDE = "sde",
+  SAP = "sap",
 }
 
 /** Company category within a domain */
 export enum CompanyCategory {
-  FAANG_STYLE = 'faang_style',
-  PRODUCT_COMPANY = 'product_company',
-  SERVICE_COMPANY = 'service_company',
-  SAP_PRODUCT = 'sap_product',
-  SAP_CONSULTING = 'sap_consulting',
-  SAP_CUSTOMER = 'sap_customer',
+  FAANG_STYLE = "faang_style",
+  PRODUCT_COMPANY = "product_company",
+  SERVICE_COMPANY = "service_company",
+  SAP_PRODUCT = "sap_product",
+  SAP_CONSULTING = "sap_consulting",
+  SAP_CUSTOMER = "sap_customer",
 }
 
 /** SDE experience levels */
 export enum ExperienceLevel {
-  FRESHER = 'fresher',
-  SDE_1 = 'sde_1',
-  SDE_2 = 'sde_2',
-  SENIOR = 'senior',
-  STAFF = 'staff',
+  FRESHER = "fresher",
+  SDE_1 = "sde_1",
+  SDE_2 = "sde_2",
+  SENIOR = "senior",
+  STAFF = "staff",
 }
 
 /** Interview difficulty */
 export enum InterviewDifficulty {
-  EASY = 'easy',
-  MEDIUM = 'medium',
-  HARD = 'hard',
+  EASY = "easy",
+  MEDIUM = "medium",
+  HARD = "hard",
 }
 
 /** Interview session status */
 export enum InterviewStatus {
-  CREATED = 'created',
-  IN_PROGRESS = 'in_progress',
-  PAUSED = 'paused',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-  ERROR = 'error',
+  CREATED = "created",
+  IN_PROGRESS = "in_progress",
+  PAUSED = "paused",
+  COMPLETED = "completed",
+  CANCELLED = "cancelled",
+  ERROR = "error",
 }
 
 /** Interview mode determines behavior policies */
 export enum InterviewMode {
-  PRACTICE = 'practice',
-  ASSESSMENT = 'assessment',
-  LEARNING = 'learning',
+  PRACTICE = "practice",
+  ASSESSMENT = "assessment",
+  LEARNING = "learning",
 }
 
 /** Interviewer communication style (not evaluation standards) */
 export enum InterviewerPersonality {
-  PROFESSIONAL = 'professional',
-  FRIENDLY = 'friendly',
-  STRICT = 'strict',
+  PROFESSIONAL = "professional",
+  FRIENDLY = "friendly",
+  STRICT = "strict",
 }
 
 /** Who sent a message in the interview */
 export enum MessageRole {
-  ASSISTANT = 'assistant',
-  CANDIDATE = 'candidate',
-  SYSTEM = 'system',
+  ASSISTANT = "assistant",
+  CANDIDATE = "candidate",
+  SYSTEM = "system",
 }
 
 /** Evaluation score on the 1-4 scale + not assessed */
@@ -89,6 +89,22 @@ export enum EvaluationRating {
 }
 
 // ---- API Response Types ----
+
+/**
+ * Health check response returned by the backend /health endpoint.
+ */
+export interface SystemHealthResponse {
+  status: "ok" | "degraded";
+  timestamp: string;
+  service: string;
+  database: {
+    status: "connected" | "disconnected";
+    databaseName?: string;
+    version?: string;
+  };
+  domains: ProfessionalDomain[];
+  defaultUserStatus: UserStatus;
+}
 
 /**
  * Standard API error response.
@@ -175,21 +191,21 @@ export interface InterviewSession {
 // Every AI provider adapter normalizes its events into these.
 
 export type ConversationEvent =
-  | { type: 'session.ready'; timestamp: number }
-  | { type: 'candidate.speech.started'; timestamp: number }
-  | { type: 'candidate.speech.ended'; timestamp: number }
-  | { type: 'candidate.transcript.partial'; text: string; timestamp: number }
-  | { type: 'candidate.transcript.final'; text: string; timestamp: number }
-  | { type: 'assistant.response.started'; timestamp: number }
-  | { type: 'assistant.transcript.delta'; text: string; timestamp: number }
-  | { type: 'assistant.transcript.final'; text: string; timestamp: number }
-  | { type: 'assistant.audio.chunk'; audio: Uint8Array; timestamp: number }
-  | { type: 'assistant.audio.ended'; timestamp: number }
-  | { type: 'assistant.interrupted'; timestamp: number }
-  | { type: 'turn.completed'; timestamp: number }
-  | { type: 'interview.status'; status: InterviewStatus; timestamp: number }
-  | { type: 'session.error'; code: string; message: string; timestamp: number }
-  | { type: 'session.ended'; reason: string; timestamp: number };
+  | { type: "session.ready"; timestamp: number }
+  | { type: "candidate.speech.started"; timestamp: number }
+  | { type: "candidate.speech.ended"; timestamp: number }
+  | { type: "candidate.transcript.partial"; text: string; timestamp: number }
+  | { type: "candidate.transcript.final"; text: string; timestamp: number }
+  | { type: "assistant.response.started"; timestamp: number }
+  | { type: "assistant.transcript.delta"; text: string; timestamp: number }
+  | { type: "assistant.transcript.final"; text: string; timestamp: number }
+  | { type: "assistant.audio.chunk"; audio: Uint8Array; timestamp: number }
+  | { type: "assistant.audio.ended"; timestamp: number }
+  | { type: "assistant.interrupted"; timestamp: number }
+  | { type: "turn.completed"; timestamp: number }
+  | { type: "interview.status"; status: InterviewStatus; timestamp: number }
+  | { type: "session.error"; code: string; message: string; timestamp: number }
+  | { type: "session.ended"; reason: string; timestamp: number };
 
 // ---- Evidence Types ----
 
@@ -203,7 +219,7 @@ export interface EvidenceRecord {
   correctConcepts: string[];
   incorrectConcepts: string[];
   missingConcepts: string[];
-  reasoningQuality: 'poor' | 'fair' | 'good' | 'excellent';
+  reasoningQuality: "poor" | "fair" | "good" | "excellent";
   practicalExperience: boolean;
   confidence: number;
   notes: string;

@@ -27,21 +27,27 @@
 ## 1. Product Summary
 
 ### What we're building
+
 An AI-powered technical interview platform where software engineers and SAP consultants practice realistic voice interviews with an AI interviewer that behaves like an experienced human.
 
 ### What makes this different from a chatbot
+
 Most "AI interview" tools read questions from a list. Ours will:
+
 - **Probe** — ask follow-up questions based on what the candidate actually said
 - **Adapt** — increase or decrease difficulty in real time
 - **Collect evidence** — track what the candidate demonstrated across many answers
 - **Evaluate independently** — a separate evaluation engine reads the transcript and evidence, not the interviewer's opinion
 
 ### Who it's for (MVP)
+
 Individual candidates preparing for:
+
 1. **SDE interviews** — FAANG-style, product companies, service companies
 2. **SAP interviews** — SAP product companies, consulting partners, enterprise customers
 
 ### Business model
+
 B2C candidate-first. Free tier to start. Enterprise features designed into the architecture but not built yet.
 
 ---
@@ -49,19 +55,21 @@ B2C candidate-first. Free tier to start. Enterprise features designed into the a
 ## 2. MVP Scope
 
 ### What's IN the MVP
-| Feature | Description |
-|---------|-------------|
-| Auth | Email/password registration & login |
-| Onboarding | Domain → Company category → Role → Experience → Difficulty → Duration → Personality |
-| Interview tracks | SDE (3 company categories, 5 experience levels) |
-| Voice interview | Browser mic → AI voice response → live transcript |
-| AI interviewer | Context-aware follow-ups, adaptive difficulty, topic progression |
-| Evidence ledger | Per-competency evidence collection during interview |
-| Evaluation engine | Independent post-interview assessment with rubrics |
-| Interview report | Competency scores, strengths, gaps, recommendations |
-| Candidate dashboard | Interview history, reports |
+
+| Feature             | Description                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| Auth                | Email/password registration & login                                                 |
+| Onboarding          | Domain → Company category → Role → Experience → Difficulty → Duration → Personality |
+| Interview tracks    | SDE (3 company categories, 5 experience levels)                                     |
+| Voice interview     | Browser mic → AI voice response → live transcript                                   |
+| AI interviewer      | Context-aware follow-ups, adaptive difficulty, topic progression                    |
+| Evidence ledger     | Per-competency evidence collection during interview                                 |
+| Evaluation engine   | Independent post-interview assessment with rubrics                                  |
+| Interview report    | Competency scores, strengths, gaps, recommendations                                 |
+| Candidate dashboard | Interview history, reports                                                          |
 
 ### What's OUT of MVP (but architected for)
+
 - SAP specializations (Phase 12)
 - Coding environment with Monaco Editor (Phase 10)
 - Video feed (Phase 11)
@@ -72,7 +80,9 @@ B2C candidate-first. Free tier to start. Enterprise features designed into the a
 - Custom rubrics
 
 ### The Smallest Useful Product
+
 A candidate can:
+
 1. Sign up
 2. Select "SDE → FAANG-style → Google-style → SDE II → Medium → 15 min → Professional"
 3. Click "Start Interview"
@@ -88,12 +98,14 @@ If we can deliver this end-to-end, we have a product.
 ### Architecture Style: Modular Monolith
 
 **Why not microservices?**
+
 - We're one developer
 - Microservices add network boundaries, deployment complexity, distributed tracing, and eventual consistency problems
 - A well-structured modular monolith can be split into services later if needed
 - Companies like Shopify ran monoliths at massive scale before selectively extracting services
 
 **What "modular monolith" means:**
+
 - One deployable backend application
 - Internally organized into modules with clear boundaries
 - Modules communicate through well-defined interfaces, not by reaching into each other's internals
@@ -113,7 +125,7 @@ flowchart TD
     subgraph Server["Backend (NestJS)"]
         API["REST API Controllers"]
         WS_Server["WebSocket Gateway"]
-        
+
         subgraph Modules["Business Modules"]
             Auth["Auth Module"]
             Candidates["Candidates Module"]
@@ -123,7 +135,7 @@ flowchart TD
             Evaluations["Evaluations Module"]
             Reports["Reports Module"]
         end
-        
+
         subgraph AI["AI Layer"]
             Orchestrator["Interview Orchestrator"]
             Registry["Provider Registry"]
@@ -161,16 +173,16 @@ flowchart TD
 
 ### Key Architectural Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Architecture style | Modular monolith | Solo dev, avoid distributed system complexity |
-| Frontend framework | Next.js (App Router) | SSR for SEO pages, React for interactive UI, one framework |
-| Backend framework | NestJS | Module system, dependency injection, TypeScript-native, good for structured backends |
-| Database | PostgreSQL | Relational integrity for interview data, JSONB for flexible metadata, pgvector for future semantic features |
-| Realtime transport | WebSocket | Bidirectional audio streaming, interview state updates |
-| AI abstraction | Adapter pattern + Provider Registry | Swap providers without rewriting business logic |
-| Interview intelligence | Owned by our Orchestrator, not by the AI provider | Provider gives capabilities; we own the logic |
-| Evaluation | Separate engine, reads transcript + evidence | Prevents interviewer bias, enables re-evaluation |
+| Decision               | Choice                                            | Rationale                                                                                                   |
+| ---------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Architecture style     | Modular monolith                                  | Solo dev, avoid distributed system complexity                                                               |
+| Frontend framework     | Next.js (App Router)                              | SSR for SEO pages, React for interactive UI, one framework                                                  |
+| Backend framework      | NestJS                                            | Module system, dependency injection, TypeScript-native, good for structured backends                        |
+| Database               | PostgreSQL                                        | Relational integrity for interview data, JSONB for flexible metadata, pgvector for future semantic features |
+| Realtime transport     | WebSocket                                         | Bidirectional audio streaming, interview state updates                                                      |
+| AI abstraction         | Adapter pattern + Provider Registry               | Swap providers without rewriting business logic                                                             |
+| Interview intelligence | Owned by our Orchestrator, not by the AI provider | Provider gives capabilities; we own the logic                                                               |
+| Evaluation             | Separate engine, reads transcript + evidence      | Prevents interviewer bias, enables re-evaluation                                                            |
 
 ---
 
@@ -210,16 +222,16 @@ flowchart LR
 
 ### Backend Module Responsibilities
 
-| Module | Responsibility |
-|--------|---------------|
-| **Auth** | Registration, login, JWT tokens, session management |
-| **Candidates** | User profiles, preferences, interview history |
-| **Domains** | Professional domains, company categories, roles, experience levels |
-| **Interviews** | Interview sessions, state management, transcript storage |
-| **Evidence** | Evidence ledger — per-competency evidence records |
-| **Evaluations** | Post-interview assessment, rubric application, scoring |
-| **Reports** | Assessment reports, recommendations, progress tracking |
-| **AI Layer** | Provider contracts, adapters, registry, orchestrator |
+| Module          | Responsibility                                                     |
+| --------------- | ------------------------------------------------------------------ |
+| **Auth**        | Registration, login, JWT tokens, session management                |
+| **Candidates**  | User profiles, preferences, interview history                      |
+| **Domains**     | Professional domains, company categories, roles, experience levels |
+| **Interviews**  | Interview sessions, state management, transcript storage           |
+| **Evidence**    | Evidence ledger — per-competency evidence records                  |
+| **Evaluations** | Post-interview assessment, rubric application, scoring             |
+| **Reports**     | Assessment reports, recommendations, progress tracking             |
+| **AI Layer**    | Provider contracts, adapters, registry, orchestrator               |
 
 ---
 
@@ -255,7 +267,7 @@ sequenceDiagram
     WS-->>C: session.ready
 
     Note over C,AI: 3. Interview Loop (repeated)
-    
+
     rect rgb(240, 248, 255)
         Note over IO: AI asks opening question
         IO->>AI: Generate opening (context + prompt)
@@ -298,7 +310,7 @@ sequenceDiagram
     EE->>EE: Apply rubrics
     EE->>EE: Score competencies
     EE->>DB: Store evaluation + report
-    
+
     Note over C,DB: 6. Report Ready
     C->>API: GET /interviews/:id/report
     API->>DB: Fetch report
@@ -324,51 +336,51 @@ The AI provider receives a carefully constructed prompt with context and returns
 
 ### Frontend
 
-| Technology | Why |
-|-----------|-----|
-| **Next.js 15 (App Router)** | Server components for landing/dashboard pages (fast initial load, SEO). Client components for the interactive interview room. One framework handles both. |
-| **React 19** | Component model, hooks, excellent ecosystem. You likely already know React basics. |
-| **TypeScript** | Catches bugs at compile time. Essential for a complex app with many data shapes. |
-| **Tailwind CSS 4** | Utility-first CSS — fast to build UIs, no naming debates, small bundle with purging. |
-| **shadcn/ui** | Not a dependency — copies accessible, well-built components into your project. You own the code. Built on Radix UI primitives (proper ARIA, keyboard nav). |
-| **Web Audio API** | Browser-native audio capture. No extra library needed for mic access. |
+| Technology                  | Why                                                                                                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Next.js 15 (App Router)** | Server components for landing/dashboard pages (fast initial load, SEO). Client components for the interactive interview room. One framework handles both.  |
+| **React 19**                | Component model, hooks, excellent ecosystem. You likely already know React basics.                                                                         |
+| **TypeScript**              | Catches bugs at compile time. Essential for a complex app with many data shapes.                                                                           |
+| **Tailwind CSS 4**          | Utility-first CSS — fast to build UIs, no naming debates, small bundle with purging.                                                                       |
+| **shadcn/ui**               | Not a dependency — copies accessible, well-built components into your project. You own the code. Built on Radix UI primitives (proper ARIA, keyboard nav). |
+| **Web Audio API**           | Browser-native audio capture. No extra library needed for mic access.                                                                                      |
 
 ### Backend
 
-| Technology | Why |
-|-----------|-----|
-| **NestJS** | Opinionated module structure, built-in dependency injection, decorators for routes/guards/pipes, WebSocket gateway support. Teaches you enterprise patterns while being productive. |
-| **TypeScript** | Shared types between frontend and backend. Same language everywhere. |
-| **TypeORM** | TypeScript-native ORM with migration support. Decorators match NestJS style. Alternatives: Prisma (better DX but less control), Drizzle (newer). TypeORM is battle-tested for this use case. |
-| **Passport.js** | Authentication strategies. Works well with NestJS guards. |
-| **Socket.IO** | WebSocket library with fallback, rooms, namespaces, reconnection. More robust than raw `ws` for our bidirectional audio streaming needs. |
+| Technology      | Why                                                                                                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **NestJS**      | Opinionated module structure, built-in dependency injection, decorators for routes/guards/pipes, WebSocket gateway support. Teaches you enterprise patterns while being productive.          |
+| **TypeScript**  | Shared types between frontend and backend. Same language everywhere.                                                                                                                         |
+| **TypeORM**     | TypeScript-native ORM with migration support. Decorators match NestJS style. Alternatives: Prisma (better DX but less control), Drizzle (newer). TypeORM is battle-tested for this use case. |
+| **Passport.js** | Authentication strategies. Works well with NestJS guards.                                                                                                                                    |
+| **Socket.IO**   | WebSocket library with fallback, rooms, namespaces, reconnection. More robust than raw `ws` for our bidirectional audio streaming needs.                                                     |
 
 ### Database & Infrastructure
 
-| Technology | Why |
-|-----------|-----|
+| Technology        | Why                                                                                                                                                              |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **PostgreSQL 16** | Relational integrity for interviews, users, evaluations. JSONB for flexible AI metadata. pgvector extension for future semantic search. Industry standard. Free. |
-| **Redis** | Interview session cache (fast reads during active interviews), BullMQ job queue for async evaluation. |
-| **BullMQ** | Queue for post-interview evaluation jobs. When an interview ends, we queue the evaluation — the candidate doesn't wait for it synchronously. |
-| **MinIO** | S3-compatible object storage that runs locally. For resumes, recordings. Swap to AWS S3/GCS in production. |
+| **Redis**         | Interview session cache (fast reads during active interviews), BullMQ job queue for async evaluation.                                                            |
+| **BullMQ**        | Queue for post-interview evaluation jobs. When an interview ends, we queue the evaluation — the candidate doesn't wait for it synchronously.                     |
+| **MinIO**         | S3-compatible object storage that runs locally. For resumes, recordings. Swap to AWS S3/GCS in production.                                                       |
 
 ### AI Providers (Initial)
 
-| Provider | Role | Why |
-|----------|------|-----|
+| Provider          | Role                                   | Why                                                                                                |
+| ----------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | **Google Gemini** | Primary LLM + potential realtime voice | Free tier available, multimodal, strong reasoning. Gemini 2.0 Flash has native audio capabilities. |
-| **Deepgram** | Alternative STT/TTS | Excellent streaming STT (Nova-2), low-latency TTS (Aura). \$200 free credit for new accounts. |
-| **OpenAI** | Alternative LLM | GPT-4o with realtime API. Pay-per-use but strong capability. Future option. |
+| **Deepgram**      | Alternative STT/TTS                    | Excellent streaming STT (Nova-2), low-latency TTS (Aura). \$200 free credit for new accounts.      |
+| **OpenAI**        | Alternative LLM                        | GPT-4o with realtime API. Pay-per-use but strong capability. Future option.                        |
 
 ### Development Tools
 
-| Tool | Why |
-|------|-----|
-| **pnpm** | Fast, disk-efficient package manager. Excellent monorepo/workspace support. |
-| **Turborepo** | Monorepo build orchestration — parallel builds, caching. Lightweight. |
-| **ESLint + Prettier** | Code quality and consistent formatting |
-| **Vitest** | Fast TypeScript-native test runner. Compatible with Jest API. |
-| **Swagger/OpenAPI** | Auto-generated API docs from NestJS decorators |
+| Tool                  | Why                                                                         |
+| --------------------- | --------------------------------------------------------------------------- |
+| **pnpm**              | Fast, disk-efficient package manager. Excellent monorepo/workspace support. |
+| **Turborepo**         | Monorepo build orchestration — parallel builds, caching. Lightweight.       |
+| **ESLint + Prettier** | Code quality and consistent formatting                                      |
+| **Vitest**            | Fast TypeScript-native test runner. Compatible with Jest API.               |
+| **Swagger/OpenAPI**   | Auto-generated API docs from NestJS decorators                              |
 
 > [!NOTE]
 > **Why pnpm + Turborepo instead of Nx?**
@@ -384,21 +396,21 @@ The AI provider receives a carefully constructed prompt with context and returns
 erDiagram
     USERS ||--o| CANDIDATE_PROFILES : has
     CANDIDATE_PROFILES ||--o{ INTERVIEW_SESSIONS : takes
-    
+
     PROFESSIONAL_DOMAINS ||--o{ COMPANY_CATEGORIES : contains
     COMPANY_CATEGORIES ||--o{ COMPANY_PROFILES : contains
     COMPANY_PROFILES ||--o{ INTERVIEW_TEMPLATES : defines
     PROFESSIONAL_DOMAINS ||--o{ ROLES : contains
     ROLES ||--o{ EXPERIENCE_LEVELS : has
-    
+
     INTERVIEW_TEMPLATES ||--o{ TEMPLATE_COMPETENCIES : includes
     TEMPLATE_COMPETENCIES }o--|| COMPETENCIES : references
     COMPETENCIES ||--o{ EVALUATION_RUBRICS : scored_by
-    
+
     INTERVIEW_SESSIONS ||--o{ INTERVIEW_MESSAGES : contains
     INTERVIEW_SESSIONS ||--o{ EVIDENCE_RECORDS : produces
     EVIDENCE_RECORDS }o--|| COMPETENCIES : maps_to
-    
+
     INTERVIEW_SESSIONS ||--o| EVALUATIONS : assessed_by
     EVALUATIONS ||--o{ COMPETENCY_SCORES : contains
     COMPETENCY_SCORES }o--|| COMPETENCIES : scores
@@ -597,26 +609,26 @@ erDiagram
 
 ### Key Design Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| **UUIDs as PKs** | No sequential ID guessing in URLs. Safe for multi-tenant future. |
-| **Separate `users` and `candidate_profiles`** | Users table is for auth. Profile is for interview context. A user might later be an interviewer or admin. |
-| **Evidence as separate records, not embedded JSON** | We need to query evidence by competency, join with messages, aggregate across interviews. Relational > JSON blob. |
-| **`interview_state` as JSONB** | Active interview state (current topic index, difficulty adjustments) is ephemeral and schema-flexible. JSONB is appropriate here. |
-| **`ai_provider_config` as JSONB** | Provider-specific session metadata varies by provider. JSONB avoids a column per provider. |
-| **Template + competency join table** | Different templates weight competencies differently. A Google SDE II template weights System Design at 25%; a service company template might weight it at 10%. |
+| Decision                                            | Rationale                                                                                                                                                      |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **UUIDs as PKs**                                    | No sequential ID guessing in URLs. Safe for multi-tenant future.                                                                                               |
+| **Separate `users` and `candidate_profiles`**       | Users table is for auth. Profile is for interview context. A user might later be an interviewer or admin.                                                      |
+| **Evidence as separate records, not embedded JSON** | We need to query evidence by competency, join with messages, aggregate across interviews. Relational > JSON blob.                                              |
+| **`interview_state` as JSONB**                      | Active interview state (current topic index, difficulty adjustments) is ephemeral and schema-flexible. JSONB is appropriate here.                              |
+| **`ai_provider_config` as JSONB**                   | Provider-specific session metadata varies by provider. JSONB avoids a column per provider.                                                                     |
+| **Template + competency join table**                | Different templates weight competencies differently. A Google SDE II template weights System Design at 25%; a service company template might weight it at 10%. |
 
 ### Access Patterns & Indexes
 
-| Query | Indexes Needed |
-|-------|---------------|
-| Login by email | `users.email` (unique) |
-| Get candidate's interviews | `interview_sessions.candidate_id` |
-| Get messages for a session | `interview_messages.session_id` + `sequence_number` |
-| Get evidence for a session | `evidence_records.session_id` |
-| Get evidence by competency | `evidence_records.competency_id` |
-| List templates by domain/role | `interview_templates.company_profile_id`, `role_id` |
-| Active interviews | `interview_sessions.status` (partial index WHERE status = 'active') |
+| Query                         | Indexes Needed                                                      |
+| ----------------------------- | ------------------------------------------------------------------- |
+| Login by email                | `users.email` (unique)                                              |
+| Get candidate's interviews    | `interview_sessions.candidate_id`                                   |
+| Get messages for a session    | `interview_messages.session_id` + `sequence_number`                 |
+| Get evidence for a session    | `evidence_records.session_id`                                       |
+| Get evidence by competency    | `evidence_records.competency_id`                                    |
+| List templates by domain/role | `interview_templates.company_profile_id`, `role_id`                 |
+| Active interviews             | `interview_sessions.status` (partial index WHERE status = 'active') |
 
 ---
 
@@ -630,7 +642,7 @@ If we hardcode Gemini SDK calls throughout our interview logic:
 // ❌ BAD: Business logic coupled to Gemini
 async function askFollowUp(context) {
   const gemini = new GoogleGenerativeAI(process.env.GEMINI_KEY);
-  const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const model = gemini.getGenerativeModel({ model: "gemini-2.0-flash" });
   const result = await model.generateContent(buildPrompt(context));
   // ...
 }
@@ -666,7 +678,7 @@ flowchart TD
     Orch --> ILLM
     Orch --> IRV
     Eval --> IEval
-    
+
     ILLM -.->|implements| GeminiLLM
     ILLM -.->|implements| OpenAILLM
     IRV -.->|implements| GeminiRT
@@ -681,15 +693,15 @@ flowchart TD
 
 Not every provider supports everything. The registry must know this:
 
-| Capability | Gemini | OpenAI | Deepgram |
-|-----------|--------|--------|----------|
-| Streaming LLM | ✅ | ✅ | ❌ (BYO-LLM) |
-| Native realtime voice | ✅ (Live API) | ✅ (Realtime API) | ✅ (Voice Agent) |
-| Standalone STT | ✅ | ✅ (Whisper) | ✅ (Nova-2) |
-| Standalone TTS | ✅ | ✅ | ✅ (Aura) |
-| Function calling | ✅ | ✅ | Via LLM |
-| Interruption handling | ✅ | ✅ | ✅ |
-| Free tier | ✅ (generous) | ❌ (pay-per-use) | ✅ (\$200 credit) |
+| Capability            | Gemini        | OpenAI            | Deepgram          |
+| --------------------- | ------------- | ----------------- | ----------------- |
+| Streaming LLM         | ✅            | ✅                | ❌ (BYO-LLM)      |
+| Native realtime voice | ✅ (Live API) | ✅ (Realtime API) | ✅ (Voice Agent)  |
+| Standalone STT        | ✅            | ✅ (Whisper)      | ✅ (Nova-2)       |
+| Standalone TTS        | ✅            | ✅                | ✅ (Aura)         |
+| Function calling      | ✅            | ✅                | Via LLM           |
+| Interruption handling | ✅            | ✅                | ✅                |
+| Free tier             | ✅ (generous) | ❌ (pay-per-use)  | ✅ (\$200 credit) |
 
 ### Canonical Event Protocol
 
@@ -700,6 +712,7 @@ Provider SDK events → Adapter → Canonical ConversationEvent → WebSocket �
 ```
 
 This means:
+
 - Gemini's `responseModalities` events get mapped to `assistant.audio.chunk` + `assistant.transcript.delta`
 - Deepgram's `Results` events get mapped to `candidate.transcript.final`
 - OpenAI's `response.audio.delta` gets mapped to `assistant.audio.chunk`
@@ -713,12 +726,14 @@ Candidate mic → WebSocket → Backend → Gemini Live API → Audio response �
 ```
 
 **Why start here:**
+
 - Simplest integration (one provider handles STT + LLM + TTS)
 - Gemini has a generous free tier
 - Lower latency than cascaded pipeline
 - We can add the cascaded pipeline (Architecture B) later as an alternative
 
 **The architectural abstraction still applies.** Even though Gemini Live handles everything internally, our Orchestrator still:
+
 - Owns the interview state
 - Decides what context to inject
 - Manages topic progression
@@ -731,41 +746,41 @@ Candidate mic → WebSocket → Backend → Gemini Live API → Audio response �
 
 ### REST API Endpoints (Core)
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| POST | `/api/auth/register` | Create account |
-| POST | `/api/auth/login` | Sign in |
-| POST | `/api/auth/logout` | Sign out |
-| GET | `/api/auth/me` | Current user |
-| GET | `/api/candidates/profile` | Get candidate profile |
-| PUT | `/api/candidates/profile` | Update profile |
-| POST | `/api/candidates/resume` | Upload resume |
-| GET | `/api/domains` | List professional domains |
-| GET | `/api/domains/:id/categories` | Company categories for domain |
-| GET | `/api/domains/:id/roles` | Roles for domain |
-| GET | `/api/roles/:id/experience-levels` | Experience levels for role |
-| GET | `/api/interview-templates` | Available templates (filtered) |
-| POST | `/api/interviews` | Create interview session |
-| GET | `/api/interviews` | List candidate's interviews |
-| GET | `/api/interviews/:id` | Interview details |
-| GET | `/api/interviews/:id/transcript` | Full transcript |
-| GET | `/api/interviews/:id/report` | Evaluation report |
+| Method | Endpoint                           | Purpose                        |
+| ------ | ---------------------------------- | ------------------------------ |
+| POST   | `/api/auth/register`               | Create account                 |
+| POST   | `/api/auth/login`                  | Sign in                        |
+| POST   | `/api/auth/logout`                 | Sign out                       |
+| GET    | `/api/auth/me`                     | Current user                   |
+| GET    | `/api/candidates/profile`          | Get candidate profile          |
+| PUT    | `/api/candidates/profile`          | Update profile                 |
+| POST   | `/api/candidates/resume`           | Upload resume                  |
+| GET    | `/api/domains`                     | List professional domains      |
+| GET    | `/api/domains/:id/categories`      | Company categories for domain  |
+| GET    | `/api/domains/:id/roles`           | Roles for domain               |
+| GET    | `/api/roles/:id/experience-levels` | Experience levels for role     |
+| GET    | `/api/interview-templates`         | Available templates (filtered) |
+| POST   | `/api/interviews`                  | Create interview session       |
+| GET    | `/api/interviews`                  | List candidate's interviews    |
+| GET    | `/api/interviews/:id`              | Interview details              |
+| GET    | `/api/interviews/:id/transcript`   | Full transcript                |
+| GET    | `/api/interviews/:id/report`       | Evaluation report              |
 
 ### WebSocket Events
 
-| Direction | Event | Purpose |
-|-----------|-------|---------|
-| Client → Server | `session.join` | Join interview room |
-| Client → Server | `audio.chunk` | Stream microphone audio |
-| Client → Server | `interview.pause` | Pause interview |
-| Client → Server | `interview.end` | End interview |
-| Server → Client | `session.ready` | Interview ready to begin |
-| Server → Client | `assistant.audio.chunk` | AI voice audio |
+| Direction       | Event                        | Purpose                      |
+| --------------- | ---------------------------- | ---------------------------- |
+| Client → Server | `session.join`               | Join interview room          |
+| Client → Server | `audio.chunk`                | Stream microphone audio      |
+| Client → Server | `interview.pause`            | Pause interview              |
+| Client → Server | `interview.end`              | End interview                |
+| Server → Client | `session.ready`              | Interview ready to begin     |
+| Server → Client | `assistant.audio.chunk`      | AI voice audio               |
 | Server → Client | `assistant.transcript.delta` | AI speech text (incremental) |
-| Server → Client | `candidate.transcript.final` | Recognized candidate speech |
-| Server → Client | `interview.status` | State changes |
-| Server → Client | `session.error` | Error notification |
-| Server → Client | `session.ended` | Interview complete |
+| Server → Client | `candidate.transcript.final` | Recognized candidate speech  |
+| Server → Client | `interview.status`           | State changes                |
+| Server → Client | `session.error`              | Error notification           |
+| Server → Client | `session.ended`              | Interview complete           |
 
 ### API Design Principles
 
@@ -781,43 +796,43 @@ Candidate mic → WebSocket → Backend → Gemini Live API → Audio response �
 
 ### Authentication & Authorization
 
-| Control | Implementation |
-|---------|---------------|
-| Password hashing | bcrypt (cost factor 12) |
-| Session tokens | JWT (short-lived access + longer refresh) |
-| WebSocket auth | Token validated on connection, not per-message |
-| Route protection | NestJS Guards on every protected endpoint |
-| CORS | Whitelist frontend origin only |
+| Control          | Implementation                                 |
+| ---------------- | ---------------------------------------------- |
+| Password hashing | bcrypt (cost factor 12)                        |
+| Session tokens   | JWT (short-lived access + longer refresh)      |
+| WebSocket auth   | Token validated on connection, not per-message |
+| Route protection | NestJS Guards on every protected endpoint      |
+| CORS             | Whitelist frontend origin only                 |
 
 ### Input Validation
 
-| Surface | Control |
-|---------|---------|
-| API inputs | class-validator decorators on DTOs |
-| File uploads | Type checking (magic bytes, not just extension), size limits |
-| WebSocket messages | Schema validation before processing |
-| SQL | Parameterized queries via ORM (no string concatenation) |
-| XSS | React's default escaping + CSP headers |
+| Surface            | Control                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| API inputs         | class-validator decorators on DTOs                           |
+| File uploads       | Type checking (magic bytes, not just extension), size limits |
+| WebSocket messages | Schema validation before processing                          |
+| SQL                | Parameterized queries via ORM (no string concatenation)      |
+| XSS                | React's default escaping + CSP headers                       |
 
 ### AI-Specific Security
 
-| Risk | Mitigation |
-|------|-----------|
-| API keys in browser | Never. All AI calls go through our backend. |
-| Prompt injection | Candidate input is clearly delineated in prompts as "candidate said:" — not mixed with system instructions |
-| Candidate code execution | Isolated sandbox (Phase 10) — never `eval()` in the backend |
-| Data sent to AI providers | Audit what we send. Use synthetic data in dev. Disclose to users what data is processed by AI. |
+| Risk                      | Mitigation                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| API keys in browser       | Never. All AI calls go through our backend.                                                                |
+| Prompt injection          | Candidate input is clearly delineated in prompts as "candidate said:" — not mixed with system instructions |
+| Candidate code execution  | Isolated sandbox (Phase 10) — never `eval()` in the backend                                                |
+| Data sent to AI providers | Audit what we send. Use synthetic data in dev. Disclose to users what data is processed by AI.             |
 
 ### Privacy & Consent
 
-| Requirement | Implementation |
-|-------------|---------------|
-| Recording consent | Explicit consent before interview starts |
-| Data retention | Configurable retention period, ability to delete |
-| Right to deletion | API to delete user data + cascaded interview data |
-| AI disclosure | Clear disclosure that the interviewer is AI |
-| No facial analysis | Video is optional and never analyzed for emotions/appearance |
-| Transcript ownership | Candidates can export their transcripts |
+| Requirement          | Implementation                                               |
+| -------------------- | ------------------------------------------------------------ |
+| Recording consent    | Explicit consent before interview starts                     |
+| Data retention       | Configurable retention period, ability to delete             |
+| Right to deletion    | API to delete user data + cascaded interview data            |
+| AI disclosure        | Clear disclosure that the interviewer is AI                  |
+| No facial analysis   | Video is optional and never analyzed for emotions/appearance |
+| Transcript ownership | Candidates can export their transcripts                      |
 
 > [!WARNING]
 > Before sending any real personal data to AI providers in production, review each provider's data retention, training, and privacy policies. During development, use synthetic/test data only.
@@ -828,21 +843,21 @@ Candidate mic → WebSocket → Backend → Gemini Live API → Audio response �
 
 ### Technical Risks
 
-| Risk | Severity | Likelihood | Mitigation |
-|------|----------|-----------|------------|
-| Gemini Live API doesn't support our audio streaming pattern from browser | **High** | Medium | Build a proof-of-concept in Phase 4 before committing. Have Deepgram cascaded pipeline as fallback. |
-| Voice latency too high for natural conversation | **High** | Medium | Measure latency in PoC. Consider edge deployment. Optimize context window size. |
-| AI interviewer asks poor follow-up questions | **High** | Medium | Invest heavily in prompt engineering. Build test scenarios (Section 16 of your spec). Iterate. |
-| Free tier API limits hit during development | **Medium** | High | Track usage. Use mocked providers for unit tests. Reserve real API calls for integration tests. |
-| PostgreSQL not available locally | **Low** | Known | Install via Homebrew or use Docker. Will set up in Phase 1. |
+| Risk                                                                     | Severity   | Likelihood | Mitigation                                                                                          |
+| ------------------------------------------------------------------------ | ---------- | ---------- | --------------------------------------------------------------------------------------------------- |
+| Gemini Live API doesn't support our audio streaming pattern from browser | **High**   | Medium     | Build a proof-of-concept in Phase 4 before committing. Have Deepgram cascaded pipeline as fallback. |
+| Voice latency too high for natural conversation                          | **High**   | Medium     | Measure latency in PoC. Consider edge deployment. Optimize context window size.                     |
+| AI interviewer asks poor follow-up questions                             | **High**   | Medium     | Invest heavily in prompt engineering. Build test scenarios (Section 16 of your spec). Iterate.      |
+| Free tier API limits hit during development                              | **Medium** | High       | Track usage. Use mocked providers for unit tests. Reserve real API calls for integration tests.     |
+| PostgreSQL not available locally                                         | **Low**    | Known      | Install via Homebrew or use Docker. Will set up in Phase 1.                                         |
 
 ### Product Risks
 
-| Risk | Severity | Mitigation |
-|------|----------|-----------|
-| AI evaluation accuracy is poor | High | Benchmark against human ratings. Show confidence levels. Don't claim AI scores are hiring decisions. |
-| Interview feels robotic | High | Personality system, natural transitions, varied question phrasing. Test with real users. |
-| Users don't trust AI feedback | Medium | Show evidence citations. Transparency about AI limitations. |
+| Risk                           | Severity | Mitigation                                                                                           |
+| ------------------------------ | -------- | ---------------------------------------------------------------------------------------------------- |
+| AI evaluation accuracy is poor | High     | Benchmark against human ratings. Show confidence levels. Don't claim AI scores are hiring decisions. |
+| Interview feels robotic        | High     | Personality system, natural transitions, varied question phrasing. Test with real users.             |
+| Users don't trust AI feedback  | Medium   | Show evidence citations. Transparency about AI limitations.                                          |
 
 ### Riskiest Technical Assumption
 
@@ -858,29 +873,29 @@ If Gemini Live doesn't work well for browser-based bidirectional audio, we pivot
 
 ### Development Phase (Months 1-3)
 
-| Resource | Cost (USD) | Cost (INR) | Notes |
-|----------|-----------|-----------|-------|
-| PostgreSQL | Free | Free | Local install via Homebrew |
-| Redis | Free | Free | Local install via Homebrew |
-| Node.js / pnpm / NestJS | Free | Free | Open source |
-| Next.js / React / Tailwind | Free | Free | Open source |
-| Gemini API | Free | Free | Free tier: 15 RPM, 1M tokens/day for Flash |
-| Deepgram | ~Free | ~Free | \$200 free credit for new accounts |
-| GitHub | Free | Free | Free for public/private repos |
-| MinIO | Free | Free | Local object storage |
-| Domain name (optional) | ~\$10-15/yr | ~₹850-1250/yr | Not needed for dev |
-| **Total dev cost** | **~\$0** | **~₹0** | Until free credits exhaust |
+| Resource                   | Cost (USD)  | Cost (INR)    | Notes                                      |
+| -------------------------- | ----------- | ------------- | ------------------------------------------ |
+| PostgreSQL                 | Free        | Free          | Local install via Homebrew                 |
+| Redis                      | Free        | Free          | Local install via Homebrew                 |
+| Node.js / pnpm / NestJS    | Free        | Free          | Open source                                |
+| Next.js / React / Tailwind | Free        | Free          | Open source                                |
+| Gemini API                 | Free        | Free          | Free tier: 15 RPM, 1M tokens/day for Flash |
+| Deepgram                   | ~Free       | ~Free         | \$200 free credit for new accounts         |
+| GitHub                     | Free        | Free          | Free for public/private repos              |
+| MinIO                      | Free        | Free          | Local object storage                       |
+| Domain name (optional)     | ~\$10-15/yr | ~₹850-1250/yr | Not needed for dev                         |
+| **Total dev cost**         | **~\$0**    | **~₹0**       | Until free credits exhaust                 |
 
 ### Production Phase (estimate per month, low usage)
 
-| Resource | Cost (USD) | Cost (INR) | Notes |
-|----------|-----------|-----------|-------|
-| VPS (e.g., Railway, Render, DigitalOcean) | \$5-25/mo | ₹420-2100/mo | Depends on tier |
-| PostgreSQL (managed) | \$0-15/mo | ₹0-1250/mo | Free tiers available |
-| Redis (managed) | \$0-10/mo | ₹0-850/mo | Free tiers available |
-| Gemini API (pay-as-you-go) | Variable | Variable | ~\$0.075/1M input tokens (Flash) |
-| Object storage | \$0-5/mo | ₹0-420/mo | Minimal at low scale |
-| **Estimated total** | **\$5-55/mo** | **₹420-4600/mo** | Low usage |
+| Resource                                  | Cost (USD)    | Cost (INR)       | Notes                            |
+| ----------------------------------------- | ------------- | ---------------- | -------------------------------- |
+| VPS (e.g., Railway, Render, DigitalOcean) | \$5-25/mo     | ₹420-2100/mo     | Depends on tier                  |
+| PostgreSQL (managed)                      | \$0-15/mo     | ₹0-1250/mo       | Free tiers available             |
+| Redis (managed)                           | \$0-10/mo     | ₹0-850/mo        | Free tiers available             |
+| Gemini API (pay-as-you-go)                | Variable      | Variable         | ~\$0.075/1M input tokens (Flash) |
+| Object storage                            | \$0-5/mo      | ₹0-420/mo        | Minimal at low scale             |
+| **Estimated total**                       | **\$5-55/mo** | **₹420-4600/mo** | Low usage                        |
 
 > [!NOTE]
 > These are rough estimates. Actual AI API costs depend heavily on interview length, number of users, and model choice. We'll track usage carefully and add cost monitoring.
@@ -910,18 +925,18 @@ flowchart LR
 
 ### Time Estimates (Solo Developer)
 
-| Phase | Estimated Duration | Cumulative |
-|-------|-------------------|-----------|
-| Phase 0: Architecture | 1 day | Day 1 |
-| Phase 1: Project Setup | 2-3 days | Day 4 |
-| Phase 2: Auth & Onboarding | 4-5 days | Day 9 |
-| Phase 3: Interview Tracks | 3-4 days | Day 13 |
-| Phase 4: AI Abstraction + PoC | 5-7 days | Day 20 |
-| Phase 5: Voice MVP | 7-10 days | Day 30 |
-| Phase 6: Orchestrator | 5-7 days | Day 37 |
-| Phase 7: Evidence Engine | 3-5 days | Day 42 |
-| Phase 8: Evaluation | 5-7 days | Day 49 |
-| Phase 9: Reports & Dashboard | 4-5 days | Day 54 |
+| Phase                         | Estimated Duration | Cumulative |
+| ----------------------------- | ------------------ | ---------- |
+| Phase 0: Architecture         | 1 day              | Day 1      |
+| Phase 1: Project Setup        | 2-3 days           | Day 4      |
+| Phase 2: Auth & Onboarding    | 4-5 days           | Day 9      |
+| Phase 3: Interview Tracks     | 3-4 days           | Day 13     |
+| Phase 4: AI Abstraction + PoC | 5-7 days           | Day 20     |
+| Phase 5: Voice MVP            | 7-10 days          | Day 30     |
+| Phase 6: Orchestrator         | 5-7 days           | Day 37     |
+| Phase 7: Evidence Engine      | 3-5 days           | Day 42     |
+| Phase 8: Evaluation           | 5-7 days           | Day 49     |
+| Phase 9: Reports & Dashboard  | 4-5 days           | Day 54     |
 
 **MVP (Phases 0-9): ~8-9 weeks of focused development**
 
@@ -951,7 +966,7 @@ You (the developer) should be able to answer "yes" to all of these:
 Once you've reviewed this document and confirmed you understand the architecture:
 
 1. I'll walk you through **Phase 1: Project Setup** — we'll create the monorepo, install dependencies, wire up the frontend, backend, and database connection.
-2. Every step will include explanations of *what* we're doing and *why*.
+2. Every step will include explanations of _what_ we're doing and _why_.
 3. We'll verify everything works before moving on.
 
 **Please review this document carefully. Ask me about anything that's unclear — architectural decisions, technology choices, data flow, terminology, or trade-offs. This is the foundation everything else builds on.**

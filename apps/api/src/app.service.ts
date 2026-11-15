@@ -1,25 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { ProfessionalDomain, UserStatus } from '@interviewai/shared-types';
-
-export interface HealthCheckResponse {
-  status: 'ok' | 'degraded';
-  timestamp: string;
-  service: string;
-  database: {
-    status: 'connected' | 'disconnected';
-    databaseName?: string;
-    version?: string;
-  };
-  domains: ProfessionalDomain[];
-  defaultUserStatus: UserStatus;
-}
+import {
+  ProfessionalDomain,
+  UserStatus,
+  type SystemHealthResponse,
+} from '@interviewai/shared-types';
 
 @Injectable()
 export class AppService {
   constructor(private readonly dataSource: DataSource) {}
 
-  async getHealth(): Promise<HealthCheckResponse> {
+  async getHealth(): Promise<SystemHealthResponse> {
     let dbStatus: 'connected' | 'disconnected' = 'disconnected';
     let dbVersion: string | undefined;
 
@@ -27,7 +18,8 @@ export class AppService {
       if (this.dataSource.isInitialized) {
         const result = await this.dataSource.query('SELECT version()');
         dbStatus = 'connected';
-        dbVersion = (result[0]?.version as string)?.split(' on ')?.[0] ?? 'PostgreSQL';
+        dbVersion =
+          (result[0]?.version as string)?.split(' on ')?.[0] ?? 'PostgreSQL';
       }
     } catch {
       dbStatus = 'disconnected';

@@ -35,26 +35,32 @@ interview-platform/
 ## Quick Start
 
 ### 1. Install Dependencies
+
 ```bash
 pnpm install
 ```
 
 ### 2. Environment Configuration
+
 Copy `.env.example` templates:
+
 ```bash
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
 ### 3. Build All Packages
+
 ```bash
 pnpm build
 ```
 
 ### 4. Start Development Servers
+
 ```bash
 pnpm dev
 ```
+
 - **Web App**: [http://localhost:3000](http://localhost:3000)
 - **API Server**: [http://localhost:4000](http://localhost:4000)
 - **API Health Check**: [http://localhost:4000/health](http://localhost:4000/health)
@@ -63,14 +69,14 @@ pnpm dev
 
 ## Key Development Commands
 
-| Command | Action |
-|---------|--------|
-| `pnpm build` | Compiles all packages in topological order via Turborepo |
-| `pnpm dev` | Starts frontend and backend dev servers in parallel |
-| `pnpm test` | Runs unit tests across all packages |
-| `pnpm type-check` | Verifies TypeScript types without emitting code |
-| `pnpm lint` | Runs linters across all packages |
-| `pnpm clean` | Cleans build artifacts (`dist`, `.next`, cache) |
+| Command           | Action                                                   |
+| ----------------- | -------------------------------------------------------- |
+| `pnpm build`      | Compiles all packages in topological order via Turborepo |
+| `pnpm dev`        | Starts frontend and backend dev servers in parallel      |
+| `pnpm test`       | Runs unit tests across all packages                      |
+| `pnpm type-check` | Verifies TypeScript types without emitting code          |
+| `pnpm lint`       | Runs linters across all packages                         |
+| `pnpm clean`      | Cleans build artifacts (`dist`, `.next`, cache)          |
 
 ---
 
@@ -81,5 +87,6 @@ pnpm dev
 - **Independent Evaluation**: Interviewing and grading are two distinct pipelines.
 
 For detailed architecture blueprints and milestone status, see:
+
 - [Phase 0 Architecture Specification](docs/phase-0-architecture.md)
 - [PROJECT_STATUS.md](PROJECT_STATUS.md)
