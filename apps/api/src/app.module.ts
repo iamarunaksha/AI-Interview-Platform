@@ -6,6 +6,7 @@ import { DatabaseModule } from './database/database.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
 import { CandidatesModule } from './candidates/candidates.module.js';
+import { TracksModule } from './tracks/tracks.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { CandidatesModule } from './candidates/candidates.module.js';
     UsersModule,
     AuthModule,
     CandidatesModule,
+    TracksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,7 +1,7 @@
 # Project Status: AI Interview Platform
 
 **Last Updated:** 2026-11-18  
-**Current Phase:** Phase 2: Authentication and Candidate Onboarding  
+**Current Phase:** Phase 3: Interview Track and Question Bank Engine  
 **Phase Status:** COMPLETED  
 
 ---
@@ -13,8 +13,8 @@
 | Phase 0  | Product and Technical Foundation          | **COMPLETED**          |
 | Phase 1  | Development Environment & Project Setup   | **COMPLETED**          |
 | Phase 2  | Authentication and Candidate Onboarding   | **COMPLETED**          |
-| Phase 3  | Interview Track and Question Bank Engine  | **NEXT (NOT_STARTED)** |
-| Phase 4  | AI Provider Abstraction Layer             | NOT_STARTED            |
+| Phase 3  | Interview Track and Question Bank Engine  | **COMPLETED**          |
+| Phase 4  | AI Provider Abstraction Layer             | **NEXT (NOT_STARTED)** |
 | Phase 5  | Voice Interview MVP                       | NOT_STARTED            |
 | Phase 6  | Interview Orchestrator                    | NOT_STARTED            |
 | Phase 7  | Evidence Collection Engine                | NOT_STARTED            |
@@ -29,49 +29,46 @@
 
 ---
 
-## 2. Completed Milestones (Phase 2 Acceptance Criteria)
+## 2. Completed Milestones (Phase 3 Acceptance Criteria)
 
-- [x] Designed & deployed `User` TypeORM entity with bcrypt password hashing (cost factor 12)
-- [x] Built `AuthModule` with Passport (`local` and `jwt` strategies), `JwtAuthGuard`, and dual-token rotation (15m access token, 7d refresh token)
-- [x] Endpoints verified live against Supabase PostgreSQL:
-  - `POST /api/auth/register` (with duplicate email handling & validation)
-  - `POST /api/auth/login` (with credential checking & 401 error safety)
-  - `POST /api/auth/refresh` (cryptographic token refresh)
-  - `GET  /api/auth/me` (guarded endpoint extracting user identity)
-- [x] Designed & deployed `CandidateProfile` TypeORM entity (1-to-1 relationship with User, JSONB preferences)
-- [x] Built `CandidatesModule` with onboarding endpoints:
-  - `GET  /api/candidates/profile` (auto-initializes profile on first access)
-  - `PUT  /api/candidates/profile` (updates domain, category, role, level, preferences & auto-sets `isOnboarded: true`)
-- [x] Expanded canonical `@interviewai/shared-types` with `CandidateProfileResponse` and `UpdateCandidateProfileRequest`
-- [x] Frontend authentication infrastructure:
-  - Strongly typed `api` client with token persistence and Bearer header injection
-  - `AuthProvider` context managing user identity and candidate onboarding state across React tree
-  - Responsive `Navbar` with live backend status indicator, auth state, and dynamic sign-in/out
-  - `/login` and `/register` pages with form validation and error handling
-- [x] Built 7-step Candidate Onboarding Wizard (`/onboarding`):
-  1. Domain selection (SDE vs SAP)
-  2. Company Category (FAANG-style, Product company, Service-based, SAP Product, Consulting, Customer)
-  3. Role / Specialization (Backend, Systems, SAP TM, FICO, MM, ABAP, etc.)
-  4. Experience Level (Fresher, Junior SDE 1, Mid SDE 2, Senior, Staff)
-  5. Interview Difficulty & Duration (Easy, Medium, Hard; 15, 30, 45, 60 min)
-  6. Interviewer Personality (Professional, Friendly, Strict) & Mode (Practice, Assessment, Learning)
-  7. Realtime Camera & Microphone hardware check with live preview
-- [x] Built Candidate Dashboard (`/dashboard`) displaying active track summary, account overview, and interview launching
-- [x] Full quality gates verified:
-  - `turbo run build`: 3/3 packages build cleanly
-  - `turbo run type-check`: 4/4 tasks pass with 0 errors
-  - `turbo run test`: 9/9 unit tests pass across API and controllers
-  - `pnpm format:check`: 100% Prettier compliant
-  - `pnpm lint`: Oxlint & ESLint passed with 0 errors and 0 warnings
+- [x] Designed & deployed `Competency` and `Question` TypeORM entities to Supabase PostgreSQL:
+  - Strongly typed relationship (`Competency 1:N Question`)
+  - Indexed slugs, domains, and difficulty tiers
+  - JSONB arrays for `expectedConcepts`, `commonMisconceptions`, `probingQuestions`, and `rubricGuide`
+- [x] Implemented rich seed pipeline (`question-bank.seed.ts`) covering:
+  - **SDE:** Distributed Rate Limiter Design, Concurrent LRU Cache Architecture, Consistent Hashing & Ring Partitioning, Relational Database Indexing & B+ Trees
+  - **SAP:** SAP TM Freight Unit Building & Transportation Cockpit, SAP ABAP Core Data Services (CDS) Views & Code Pushdown
+- [x] Built Adaptive Interview Traversal & Planning Engine (`TracksService.planInterview`):
+  - Traverses question graph based on duration (15m, 30m, 45m, 60m)
+  - Balances technical competencies without duplicate topics
+  - Matches candidate experience level and difficulty preferences
+- [x] Exposed RESTful APIs with class-validator DTOs:
+  - `GET  /api/tracks/competencies` (list competencies, filter by domain)
+  - `GET  /api/tracks/questions` (search question bank with multi-criteria filters)
+  - `GET  /api/tracks/questions/:id` (inspect specific question node with probes and rubrics)
+  - `POST /api/tracks/plan-interview` (plan interview session question trajectory)
+- [x] Canonical `@interviewai/shared-types` updated with:
+  - `CompetencyResponse`, `QuestionResponse`, `ProbingQuestion`, `RubricLevelGuide`, `InterviewPlanResponse`
+- [x] Frontend Track & Question Bank Explorer (`/tracks`):
+  - SDE and SAP domain tabs
+  - Competency matrix card displaying capabilities evaluated
+  - Interactive accordion question viewer with expected concepts, misconceptions, probing follow-ups, and 4-point rubric guides
+  - Difficulty filter (All, Easy, Medium, Hard)
+  - Navigation bar updated with Question Bank link
+- [x] Comprehensive test suite & quality gates:
+  - Vitest 13/13 tests passing (4 suites)
+  - 4/4 TypeScript type-checks passing with 0 errors
+  - 3/3 Turborepo packages building cleanly
+  - Prettier 100% compliant & Linters (Oxlint + ESLint) passing with 0 warnings/errors
 
 ---
 
 ## 3. Latest Verification Results
 
 - **Shared Types:** Type-check passed (Clean `tsc` compilation to `dist/`)
-- **API (NestJS):** Vitest 9/9 tests passed (AuthService, CandidatesService, AppController)
-- **Web (Next.js):** Build successful (`next build --webpack`, static page generation passed for 8 routes)
-- **Turborepo:** `turbo run build` — 3/3 successful
+- **API (NestJS):** Vitest 13/13 tests passed (`TracksService`, `AuthService`, `CandidatesService`, `AppController`)
+- **Web (Next.js):** Build successful (`next build --webpack`, static page generation passed for 9 routes)
+- **Live Supabase DB:** Seeded 6 competencies and 6 deep question nodes with active relations
 - **Linters:** Oxlint (API) & ESLint (Web) passed with 0 errors and 0 warnings
 - **Prettier:** 100% compliant (`pnpm format:check`)
 
@@ -79,7 +76,8 @@
 
 ## 4. Next Recommended Action
 
-**Commence Phase 3: Interview Track and Question Bank Engine**
-1. Design Question, Competency, Rubric, and QuestionTrack database entities.
-2. Build seed pipeline for SDE (DSA, System Design, CS fundamentals) and initial SAP (SAP TM / ABAP) question banks.
-3. Implement Question Selection & Adaptive Traversal Engine.
+**Commence Phase 4: AI Provider Abstraction Layer**
+1. Design provider-agnostic adapter interfaces (`RealtimeAudioAdapter`, `LlmAdapter`, `SttAdapter`, `TtsAdapter`).
+2. Implement Gemini Live API / Multimodal adapter (`GeminiLiveAdapter`).
+3. Implement Deepgram STT/TTS fallback adapters.
+4. Build canonical event normalizer for bidirectional streaming (`ConversationEvent`).

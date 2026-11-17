@@ -6,6 +6,13 @@ import {
   type UserProfile,
   type CandidateProfileResponse,
   type UpdateCandidateProfileRequest,
+  type CompetencyResponse,
+  type QuestionResponse,
+  type InterviewPlanResponse,
+  type ProfessionalDomain,
+  type CompanyCategory,
+  type ExperienceLevel,
+  type InterviewDifficulty,
 } from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -123,6 +130,52 @@ export const api = {
     ): Promise<CandidateProfileResponse> => {
       return apiFetch<CandidateProfileResponse>("/api/candidates/profile", {
         method: "PUT",
+        body: JSON.stringify(dto),
+      });
+    },
+  },
+
+  tracks: {
+    getCompetencies: async (
+      domain?: ProfessionalDomain,
+    ): Promise<CompetencyResponse[]> => {
+      const qs = domain ? `?domain=${domain}` : "";
+      return apiFetch<CompetencyResponse[]>(`/api/tracks/competencies${qs}`);
+    },
+
+    getQuestions: async (params?: {
+      domain?: ProfessionalDomain;
+      companyCategory?: CompanyCategory;
+      difficulty?: InterviewDifficulty;
+      experienceLevel?: ExperienceLevel;
+    }): Promise<QuestionResponse[]> => {
+      const searchParams = new URLSearchParams();
+      if (params?.domain) searchParams.set("domain", params.domain);
+      if (params?.companyCategory)
+        searchParams.set("companyCategory", params.companyCategory);
+      if (params?.difficulty) searchParams.set("difficulty", params.difficulty);
+      if (params?.experienceLevel)
+        searchParams.set("experienceLevel", params.experienceLevel);
+      const query = searchParams.toString()
+        ? `?${searchParams.toString()}`
+        : "";
+      return apiFetch<QuestionResponse[]>(`/api/tracks/questions${query}`);
+    },
+
+    getQuestion: async (id: string): Promise<QuestionResponse> => {
+      return apiFetch<QuestionResponse>(`/api/tracks/questions/${id}`);
+    },
+
+    planInterview: async (dto: {
+      domain: ProfessionalDomain;
+      companyCategory: CompanyCategory;
+      targetRole: string;
+      experienceLevel: ExperienceLevel;
+      difficulty?: InterviewDifficulty;
+      durationMinutes?: number;
+    }): Promise<InterviewPlanResponse> => {
+      return apiFetch<InterviewPlanResponse>("/api/tracks/plan-interview", {
+        method: "POST",
         body: JSON.stringify(dto),
       });
     },

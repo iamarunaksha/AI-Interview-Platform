@@ -284,3 +284,66 @@ export interface InterviewReport {
   suggestedNextDifficulty: InterviewDifficulty;
   generatedAt: string;
 }
+
+// ---- Competency & Question Bank Types ----
+
+export interface CompetencyResponse {
+  id: string;
+  domain: ProfessionalDomain;
+  name: string;
+  slug: string;
+  category: string;
+  description: string;
+  isActive: boolean;
+}
+
+export interface ProbingQuestion {
+  id: string;
+  probeText: string;
+  targetConcept: string;
+  triggerCondition:
+    | "missing_concept"
+    | "superficial_explanation"
+    | "incorrect_claim"
+    | "deep_dive";
+}
+
+export interface RubricLevelGuide {
+  rating: EvaluationRating;
+  description: string;
+  keyIndicators: string[];
+}
+
+export interface QuestionResponse {
+  id: string;
+  competencyId: string;
+  competency?: CompetencyResponse;
+  domain: ProfessionalDomain;
+  companyCategories: CompanyCategory[];
+  experienceLevels: ExperienceLevel[];
+  difficulty: InterviewDifficulty;
+  title: string;
+  stem: string;
+  contextPrompt: string;
+  expectedConcepts: string[];
+  commonMisconceptions: string[];
+  probingQuestions: ProbingQuestion[];
+  rubricGuide: RubricLevelGuide[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InterviewPlanResponse {
+  sessionTrack: {
+    domain: ProfessionalDomain;
+    companyCategory: CompanyCategory;
+    targetRole: string;
+    experienceLevel: ExperienceLevel;
+    difficulty: InterviewDifficulty;
+    durationMinutes: number;
+  };
+  competencies: CompetencyResponse[];
+  questions: QuestionResponse[];
+  estimatedQuestionsCount: number;
+}
