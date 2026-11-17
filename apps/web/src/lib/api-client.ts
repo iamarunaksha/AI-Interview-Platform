@@ -1,28 +1,133 @@
-import { type SystemHealthResponse } from "@interviewai/shared-types";
+import {
+  type SystemHealthResponse,
+  type AuthResponse,
+  type LoginRequest,
+  type RegisterRequest,
+  type UserProfile,
+  type CandidateProfileResponse,
+  type UpdateCandidateProfileRequest,
+} from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-/**
- * Client-side and server-side fetcher for backend health status.
- *
- * Pattern: Typed API client using canonical contracts from @interviewai/shared-types.
- * Handles timeouts, network disconnections, and structured fallback errors cleanly.
- */
-export async function getSystemHealth(): Promise<SystemHealthResponse | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/health`, {
-      cache: "no-store", // Always fetch fresh status
-      signal: AbortSignal.timeout(3000), // 3s timeout
-    });
+const ACCESS_TOKEN_KEY = "interviewai_access_token";
+const REFRESH_TOKEN_KEY = "interviewai_refresh_token";
 
-    if (!res.ok) {
+export function getStoredAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function setStoredTokens(
+  accessToken: string,
+  refreshToken: string,
+): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+}
+
+export function clearStoredTokens(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+async function apiFetch<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const token = getStoredAccessToken();
+  const headers = new Headers(options.headers);
+
+  if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  if (!res.ok) {
+    let errorDetails: string = `Request failed with status ${res.status}`;
+    try {
+      const errJson = await res.json();
+      if (Array.isArray(errJson.message)) {
+        errorDetails = errJson.message.join(", ");
+      } else if (errJson.message) {
+        errorDetails = errJson.message;
+      }
+    } catch {
+      // JSON parse failed, keep default message
+    }
+    throw new Error(errorDetails);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  health: async (): Promise<SystemHealthResponse | null> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/health`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!res.ok) return null;
+      return (await res.json()) as SystemHealthResponse;
+    } catch {
       return null;
     }
+  },
 
-    const data: SystemHealthResponse = await res.json();
-    return data;
-  } catch {
-    // Network unreachable, backend down, or timeout
-    return null;
-  }
-}
+  auth: {
+    register: async (dto: RegisterRequest): Promise<AuthResponse> => {
+      const data = await apiFetch<AuthResponse>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(dto),
+      });
+      setStoredTokens(data.accessToken, data.refreshToken);
+      return data;
+    },
+
+    login: async (dto: LoginRequest): Promise<AuthResponse> => {
+      const data = await apiFetch<AuthResponse>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify(dto),
+      });
+      setStoredTokens(data.accessToken, data.refreshToken);
+      return data;
+    },
+
+    me: async (): Promise<UserProfile> => {
+      return apiFetch<UserProfile>("/api/auth/me");
+    },
+
+    logout: () => {
+      clearStoredTokens();
+    },
+  },
+
+  candidates: {
+    getProfile: async (): Promise<CandidateProfileResponse> => {
+      return apiFetch<CandidateProfileResponse>("/api/candidates/profile");
+    },
+
+    updateProfile: async (
+      dto: UpdateCandidateProfileRequest,
+    ): Promise<CandidateProfileResponse> => {
+      return apiFetch<CandidateProfileResponse>("/api/candidates/profile", {
+        method: "PUT",
+        body: JSON.stringify(dto),
+      });
+    },
+  },
+};
+
+/** Backwards-compatible export for existing components */
+export const getSystemHealth = api.health;

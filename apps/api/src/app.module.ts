@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DatabaseModule } from './database/database.module.js';
+import { AuthModule } from './auth/auth.module.js';
+import { UsersModule } from './users/users.module.js';
+import { CandidatesModule } from './candidates/candidates.module.js';
 
 @Module({
   imports: [
@@ -11,6 +14,9 @@ import { DatabaseModule } from './database/database.module.js';
       envFilePath: ['.env', '.env.local'],
     }),
     DatabaseModule,
+    UsersModule,
+    AuthModule,
+    CandidatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

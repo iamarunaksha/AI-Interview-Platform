@@ -162,6 +162,39 @@ export interface UserProfile {
   createdAt: string;
 }
 
+// ---- Candidate Profile & Onboarding Types ----
+
+export interface CandidateProfileResponse {
+  id: string;
+  userId: string;
+  domain: ProfessionalDomain | null;
+  companyCategory: CompanyCategory | null;
+  targetRole: string | null;
+  experienceLevel: ExperienceLevel | null;
+  preferredDifficulty: InterviewDifficulty;
+  preferredDurationMinutes: number;
+  preferredPersonality: InterviewerPersonality;
+  preferredMode: InterviewMode;
+  resumeUrl: string | null;
+  resumeFileName: string | null;
+  isOnboarded: boolean;
+  preferences: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateCandidateProfileRequest {
+  domain?: ProfessionalDomain;
+  companyCategory?: CompanyCategory;
+  targetRole?: string;
+  experienceLevel?: ExperienceLevel;
+  preferredDifficulty?: InterviewDifficulty;
+  preferredDurationMinutes?: number;
+  preferredPersonality?: InterviewerPersonality;
+  preferredMode?: InterviewMode;
+  preferences?: Record<string, unknown>;
+}
+
 // ---- Interview Configuration Types ----
 
 export interface InterviewConfig {

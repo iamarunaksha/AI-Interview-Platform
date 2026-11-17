@@ -1,0 +1,781 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../../context/auth-context";
+import {
+  ProfessionalDomain,
+  CompanyCategory,
+  ExperienceLevel,
+  InterviewDifficulty,
+  InterviewerPersonality,
+  InterviewMode,
+  type CandidateProfileResponse,
+} from "@interviewai/shared-types";
+
+export default function OnboardingPage() {
+  const { candidateProfile, isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
+        <div className="text-zinc-500 text-sm animate-pulse">
+          Loading onboarding preferences...
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <OnboardingWizard
+      key={candidateProfile?.id ?? "guest"}
+      initialProfile={candidateProfile}
+      isAuthenticated={isAuthenticated}
+    />
+  );
+}
+
+function OnboardingWizard({
+  initialProfile,
+  isAuthenticated,
+}: {
+  initialProfile: CandidateProfileResponse | null;
+  isAuthenticated: boolean;
+}) {
+  const router = useRouter();
+  const { updateCandidateProfile } = useAuth();
+
+  const [step, setStep] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Form state initialized from initialProfile
+  const [domain, setDomain] = useState<ProfessionalDomain>(
+    initialProfile?.domain ?? ProfessionalDomain.SDE,
+  );
+  const [companyCategory, setCompanyCategory] = useState<CompanyCategory>(
+    initialProfile?.companyCategory ?? CompanyCategory.FAANG_STYLE,
+  );
+  const [targetRole, setTargetRole] = useState<string>(
+    initialProfile?.targetRole ?? "Backend Engineer",
+  );
+  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>(
+    initialProfile?.experienceLevel ?? ExperienceLevel.SDE_1,
+  );
+  const [difficulty, setDifficulty] = useState<InterviewDifficulty>(
+    initialProfile?.preferredDifficulty ?? InterviewDifficulty.MEDIUM,
+  );
+  const [duration, setDuration] = useState<number>(
+    initialProfile?.preferredDurationMinutes ?? 45,
+  );
+  const [personality, setPersonality] = useState<InterviewerPersonality>(
+    initialProfile?.preferredPersonality ?? InterviewerPersonality.PROFESSIONAL,
+  );
+  const [mode, setMode] = useState<InterviewMode>(
+    initialProfile?.preferredMode ?? InterviewMode.PRACTICE,
+  );
+
+  // Media preview state
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Adjust defaults when domain changes
+  const handleDomainChange = (newDomain: ProfessionalDomain) => {
+    setDomain(newDomain);
+    if (newDomain === ProfessionalDomain.SAP) {
+      setCompanyCategory(CompanyCategory.SAP_CONSULTING);
+      setTargetRole("SAP TM");
+    } else {
+      setCompanyCategory(CompanyCategory.FAANG_STYLE);
+      setTargetRole("Backend Engineer");
+    }
+  };
+
+  // Hardware check cleanup
+  useEffect(() => {
+    return () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [mediaStream]);
+
+  const startMediaCheck = async () => {
+    setMediaError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      setMediaStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch {
+      setMediaError(
+        "Camera/Microphone permission denied or not found. You can still test, but permissions are needed for actual voice/video interviews.",
+      );
+    }
+  };
+
+  const stopMediaCheck = () => {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+      setMediaStream(null);
+    }
+  };
+
+  const handleFinishOnboarding = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      if (isAuthenticated) {
+        await updateCandidateProfile({
+          domain,
+          companyCategory,
+          targetRole,
+          experienceLevel,
+          preferredDifficulty: difficulty,
+          preferredDurationMinutes: duration,
+          preferredPersonality: personality,
+          preferredMode: mode,
+        });
+      }
+      stopMediaCheck();
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setSaveError(err.message);
+      } else {
+        setSaveError("Failed to save profile. Please try again.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const totalSteps = 7;
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-12">
+      {/* Progress header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+          <span>Candidate Onboarding</span>
+          <span>
+            Step {step} of {totalSteps}
+          </span>
+        </div>
+        <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-600 transition-all duration-300 rounded-full"
+            style={{ width: `${(step / totalSteps) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {!isAuthenticated && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-300 text-xs flex items-center justify-between">
+          <span>
+            You are configuring an interview track as guest. Sign in to save
+            your progress permanently.
+          </span>
+          <button
+            onClick={() => router.push("/login")}
+            className="ml-4 font-semibold underline hover:text-amber-900"
+          >
+            Sign in
+          </button>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-400 text-xs">
+          {saveError}
+        </div>
+      )}
+
+      {/* Step Content Card */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-8 min-h-[420px] flex flex-col justify-between">
+        <div>
+          {/* STEP 1: Professional Domain */}
+          {step === 1 && (
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                Select your Professional Domain
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 mb-6">
+                Choose the technical path you are preparing for. Question banks,
+                rubrics, and interviewer behaviors adapt dynamically.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleDomainChange(ProfessionalDomain.SDE)}
+                  className={`p-6 rounded-xl border text-left transition-all ${
+                    domain === ProfessionalDomain.SDE
+                      ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                      : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center mb-3">
+                    &lt;/&gt;
+                  </div>
+                  <h3 className="font-semibold text-zinc-900 dark:text-white">
+                    Software Development (SDE)
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
+                    Data structures, algorithms, system design, CS fundamentals,
+                    problem solving, and production engineering.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDomainChange(ProfessionalDomain.SAP)}
+                  className={`p-6 rounded-xl border text-left transition-all ${
+                    domain === ProfessionalDomain.SAP
+                      ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                      : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 font-bold flex items-center justify-center mb-3">
+                    SAP
+                  </div>
+                  <h3 className="font-semibold text-zinc-900 dark:text-white">
+                    SAP Consulting & Engineering
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
+                    Module specializations (TM, FICO, MM, SD, EWM, ABAP),
+                    business processes, integration, and enterprise
+                    configurations.
+                  </p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: Company Category */}
+          {step === 2 && (
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                Select Company Category
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 mb-6">
+                Interview rubrics vary significantly based on company profile
+                and hiring standards.
+              </p>
+
+              <div className="space-y-3">
+                {domain === ProfessionalDomain.SDE ? (
+                  <>
+                    {[
+                      {
+                        cat: CompanyCategory.FAANG_STYLE,
+                        title: "Tier 1 / FAANG-Style Product Companies",
+                        desc: "Rigorous algorithmic problem solving, deep computer science fundamentals, scalability, and system design.",
+                      },
+                      {
+                        cat: CompanyCategory.PRODUCT_COMPANY,
+                        title: "High-Growth Product Companies / Scale-Ups",
+                        desc: "Practical engineering scenarios, system design, architecture trade-offs, debugging, and clean code.",
+                      },
+                      {
+                        cat: CompanyCategory.SERVICE_COMPANY,
+                        title: "IT Services & Consulting Enterprises",
+                        desc: "Core programming fundamentals, OOP, SQL/DBMS, OS, networking, client communication, and troubleshooting.",
+                      },
+                    ].map((item) => (
+                      <button
+                        key={item.cat}
+                        type="button"
+                        onClick={() => setCompanyCategory(item.cat)}
+                        className={`w-full p-4 rounded-xl border text-left transition-all ${
+                          companyCategory === item.cat
+                            ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                        }`}
+                      >
+                        <div className="font-semibold text-sm text-zinc-900 dark:text-white">
+                          {item.title}
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                          {item.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {[
+                      {
+                        cat: CompanyCategory.SAP_PRODUCT,
+                        title: "SAP Product Engineering",
+                        desc: "Platform architecture, core product development, extension framework, and SAP BTP.",
+                      },
+                      {
+                        cat: CompanyCategory.SAP_CONSULTING,
+                        title: "SAP Implementation Consulting Partners",
+                        desc: "Implementation lifecycle, client requirements mapping, business blueprinting, configuration, and troubleshooting.",
+                      },
+                      {
+                        cat: CompanyCategory.SAP_CUSTOMER,
+                        title: "SAP Enterprise Customer / End-User",
+                        desc: "Business process ownership, production support, incident resolution, optimization, and reporting.",
+                      },
+                    ].map((item) => (
+                      <button
+                        key={item.cat}
+                        type="button"
+                        onClick={() => setCompanyCategory(item.cat)}
+                        className={`w-full p-4 rounded-xl border text-left transition-all ${
+                          companyCategory === item.cat
+                            ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                        }`}
+                      >
+                        <div className="font-semibold text-sm text-zinc-900 dark:text-white">
+                          {item.title}
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                          {item.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Role / Specialization */}
+          {step === 3 && (
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                Select Role / Specialization
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 mb-6">
+                Choose your specific target focus area.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {(domain === ProfessionalDomain.SDE
+                  ? [
+                      "Backend Engineer",
+                      "Full-Stack Engineer",
+                      "Frontend Engineer",
+                      "Distributed Systems Engineer",
+                      "Platform / DevOps Engineer",
+                      "Data Engineer",
+                    ]
+                  : [
+                      "SAP TM (Transportation Management)",
+                      "SAP FICO (Financials & Controlling)",
+                      "SAP MM (Materials Management)",
+                      "SAP SD (Sales & Distribution)",
+                      "SAP EWM (Extended Warehouse)",
+                      "SAP ABAP / BTP Developer",
+                    ]
+                ).map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setTargetRole(role)}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      targetRole === role
+                        ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="font-medium text-xs text-zinc-900 dark:text-white">
+                      {role}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: Experience Level */}
+          {step === 4 && (
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                Select Experience Level
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 mb-6">
+                The expected depth, evaluation standards, and interview depth
+                scale with experience.
+              </p>
+
+              <div className="space-y-3">
+                {[
+                  {
+                    level: ExperienceLevel.FRESHER,
+                    title: "Graduate / Entry Level (0-1 yrs)",
+                    desc: "Focus on problem-solving aptitude, core fundamentals, and clarity of thoughts.",
+                  },
+                  {
+                    level: ExperienceLevel.SDE_1,
+                    title: "Junior / SDE I (1-3 yrs)",
+                    desc: "Focus on clean coding, standard DSA, component-level design, and debugging.",
+                  },
+                  {
+                    level: ExperienceLevel.SDE_2,
+                    title: "Mid-Level / SDE II (3-6 yrs)",
+                    desc: "Focus on high/low-level system design, edge cases, distributed systems, and architectural trade-offs.",
+                  },
+                  {
+                    level: ExperienceLevel.SENIOR,
+                    title: "Senior Engineer (6-10 yrs)",
+                    desc: "Focus on large-scale architecture, operational excellence, mentorship, and failure handling.",
+                  },
+                  {
+                    level: ExperienceLevel.STAFF,
+                    title: "Staff / Principal Engineer (10+ yrs)",
+                    desc: "Cross-domain systems, enterprise vision, high-concurrency paradigms, and strategic technical trade-offs.",
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.level}
+                    type="button"
+                    onClick={() => setExperienceLevel(item.level)}
+                    className={`w-full p-4 rounded-xl border text-left transition-all ${
+                      experienceLevel === item.level
+                        ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="font-semibold text-sm text-zinc-900 dark:text-white">
+                      {item.title}
+                    </div>
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      {item.desc}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: Difficulty & Duration */}
+          {step === 5 && (
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                Difficulty & Duration
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 mb-6">
+                Configure session length and initial question complexity.
+              </p>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                    Interview Difficulty
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      {
+                        val: InterviewDifficulty.EASY,
+                        label: "Easy",
+                        sub: "Gentle ramp-up",
+                      },
+                      {
+                        val: InterviewDifficulty.MEDIUM,
+                        label: "Medium",
+                        sub: "Industry standard",
+                      },
+                      {
+                        val: InterviewDifficulty.HARD,
+                        label: "Hard",
+                        sub: "Deep pressure testing",
+                      },
+                    ].map((item) => (
+                      <button
+                        key={item.val}
+                        type="button"
+                        onClick={() => setDifficulty(item.val)}
+                        className={`p-3.5 rounded-xl border text-center transition-all ${
+                          difficulty === item.val
+                            ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                        }`}
+                      >
+                        <div className="font-semibold text-sm text-zinc-900 dark:text-white">
+                          {item.label}
+                        </div>
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                          {item.sub}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                    Session Duration
+                  </label>
+                  <div className="grid grid-cols-4 gap-3">
+                    {[
+                      { minutes: 15, label: "15 min", sub: "Quick screen" },
+                      { minutes: 30, label: "30 min", sub: "Standard" },
+                      { minutes: 45, label: "45 min", sub: "Comprehensive" },
+                      { minutes: 60, label: "60 min", sub: "Full loop" },
+                    ].map((item) => (
+                      <button
+                        key={item.minutes}
+                        type="button"
+                        onClick={() => setDuration(item.minutes)}
+                        className={`p-3 rounded-xl border text-center transition-all ${
+                          duration === item.minutes
+                            ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                        }`}
+                      >
+                        <div className="font-semibold text-sm text-zinc-900 dark:text-white">
+                          {item.label}
+                        </div>
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                          {item.sub}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: Personality & Policy */}
+          {step === 6 && (
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                Interviewer Personality & Mode
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 mb-6">
+                Personality alters communication tone; interview mode sets
+                feedback policies.
+              </p>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                    Interviewer Personality
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      {
+                        val: InterviewerPersonality.PROFESSIONAL,
+                        title: "Professional",
+                        desc: "Objective, polite, structured corporate style",
+                      },
+                      {
+                        val: InterviewerPersonality.FRIENDLY,
+                        title: "Friendly",
+                        desc: "Encouraging, conversational, supportive tone",
+                      },
+                      {
+                        val: InterviewerPersonality.STRICT,
+                        title: "Strict",
+                        desc: "Direct, challenges weak assumptions, probes deeply",
+                      },
+                    ].map((item) => (
+                      <button
+                        key={item.val}
+                        type="button"
+                        onClick={() => setPersonality(item.val)}
+                        className={`p-3.5 rounded-xl border text-left transition-all ${
+                          personality === item.val
+                            ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                        }`}
+                      >
+                        <div className="font-semibold text-sm text-zinc-900 dark:text-white">
+                          {item.title}
+                        </div>
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug">
+                          {item.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                    Interview Mode
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      {
+                        val: InterviewMode.PRACTICE,
+                        title: "Practice Mode",
+                        desc: "Helpful guidance, hints when stuck, immediate feedback",
+                      },
+                      {
+                        val: InterviewMode.ASSESSMENT,
+                        title: "Assessment Mode",
+                        desc: "Realistic test simulation: no hints, evaluation generated at end",
+                      },
+                      {
+                        val: InterviewMode.LEARNING,
+                        title: "Learning Mode",
+                        desc: "Detailed explanations after each question and trade-off",
+                      },
+                    ].map((item) => (
+                      <button
+                        key={item.val}
+                        type="button"
+                        onClick={() => setMode(item.val)}
+                        className={`p-3.5 rounded-xl border text-left transition-all ${
+                          mode === item.val
+                            ? "border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20"
+                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                        }`}
+                      >
+                        <div className="font-semibold text-sm text-zinc-900 dark:text-white">
+                          {item.title}
+                        </div>
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug">
+                          {item.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 7: Hardware Verification & Summary */}
+          {step === 7 && (
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                Hardware Check & Ready to Launch
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 mb-6">
+                Test your camera and microphone. Voice and video interviews
+                require both.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Media Preview Box */}
+                <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center min-h-[200px]">
+                  {mediaStream ? (
+                    <div className="w-full flex flex-col items-center">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-44 object-cover rounded-lg bg-black"
+                      />
+                      <div className="mt-3 flex items-center gap-2 text-xs text-green-600 dark:text-green-400 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        Camera & Microphone Active
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <div className="text-3xl mb-2">🎙️ 📹</div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+                        Click below to verify microphone & camera access.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={startMediaCheck}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm"
+                      >
+                        Test Camera & Mic
+                      </button>
+                    </div>
+                  )}
+
+                  {mediaError && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 text-center mt-2 px-2">
+                      {mediaError}
+                    </p>
+                  )}
+                </div>
+
+                {/* Track Summary */}
+                <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50 dark:bg-zinc-950 text-xs space-y-2.5">
+                  <h3 className="font-semibold text-zinc-900 dark:text-white uppercase tracking-wider text-[11px]">
+                    Track Configuration Summary
+                  </h3>
+                  <div className="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-800">
+                    <span className="text-zinc-500">Domain</span>
+                    <span className="font-medium text-zinc-900 dark:text-white uppercase">
+                      {domain}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-800">
+                    <span className="text-zinc-500">Role</span>
+                    <span className="font-medium text-zinc-900 dark:text-white">
+                      {targetRole}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-800">
+                    <span className="text-zinc-500">Experience</span>
+                    <span className="font-medium text-zinc-900 dark:text-white uppercase">
+                      {experienceLevel}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-800">
+                    <span className="text-zinc-500">Difficulty / Time</span>
+                    <span className="font-medium text-zinc-900 dark:text-white capitalize">
+                      {difficulty} ({duration}m)
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-zinc-500">Personality / Mode</span>
+                    <span className="font-medium text-zinc-900 dark:text-white capitalize">
+                      {personality} ({mode})
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Step Navigation Controls */}
+        <div className="flex items-center justify-between pt-6 border-t border-zinc-200 dark:border-zinc-800 mt-6">
+          {step > 1 ? (
+            <button
+              type="button"
+              onClick={() => setStep((s) => s - 1)}
+              className="px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-300 dark:border-zinc-700 rounded-lg transition-colors"
+            >
+              Back
+            </button>
+          ) : (
+            <div />
+          )}
+
+          {step < totalSteps ? (
+            <button
+              type="button"
+              onClick={() => setStep((s) => s + 1)}
+              className="px-5 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors"
+            >
+              Continue
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleFinishOnboarding}
+              className="px-6 py-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-colors disabled:opacity-50"
+            >
+              {isSaving ? "Saving Configuration..." : "Complete Setup & Launch"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
