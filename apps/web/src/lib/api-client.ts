@@ -16,6 +16,9 @@ import {
   type AiSystemStatusResponse,
   type TestGenerateRequest,
   type TestGenerateResponse,
+  type CreateInterviewSessionRequest,
+  type InterviewSessionResponse,
+  type TranscriptTurn,
 } from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -195,6 +198,41 @@ export const api = {
         method: "POST",
         body: JSON.stringify(dto),
       });
+    },
+  },
+
+  interviews: {
+    create: async (
+      dto: CreateInterviewSessionRequest,
+    ): Promise<InterviewSessionResponse> => {
+      return apiFetch<InterviewSessionResponse>("/api/interviews", {
+        method: "POST",
+        body: JSON.stringify(dto),
+      });
+    },
+
+    list: async (): Promise<InterviewSessionResponse[]> => {
+      return apiFetch<InterviewSessionResponse[]>("/api/interviews");
+    },
+
+    get: async (id: string): Promise<InterviewSessionResponse> => {
+      return apiFetch<InterviewSessionResponse>(`/api/interviews/${id}`);
+    },
+
+    start: async (id: string): Promise<InterviewSessionResponse> => {
+      return apiFetch<InterviewSessionResponse>(`/api/interviews/${id}/start`, {
+        method: "POST",
+      });
+    },
+
+    end: async (id: string): Promise<InterviewSessionResponse> => {
+      return apiFetch<InterviewSessionResponse>(`/api/interviews/${id}/end`, {
+        method: "POST",
+      });
+    },
+
+    getTranscript: async (id: string): Promise<TranscriptTurn[]> => {
+      return apiFetch<TranscriptTurn[]>(`/api/interviews/${id}/transcript`);
     },
   },
 };

@@ -4,6 +4,7 @@ import type { ILlmProvider } from './interfaces/llm-provider.interface.js';
 import type { IRealtimeVoiceProvider } from './interfaces/realtime-provider.interface.js';
 import type { IEvaluationProvider } from './interfaces/evaluation-provider.interface.js';
 import { GeminiLlmAdapter } from './adapters/gemini-llm.adapter.js';
+import { GeminiRealtimeAdapter } from './adapters/gemini-realtime.adapter.js';
 import { MockAiAdapter } from './adapters/mock-ai.adapter.js';
 import { DeepgramAdapter } from './adapters/deepgram.adapter.js';
 import type {
@@ -33,6 +34,7 @@ export class ProviderRegistryService {
   constructor(
     private readonly configService: ConfigService,
     private readonly geminiAdapter: GeminiLlmAdapter,
+    private readonly geminiRealtimeAdapter: GeminiRealtimeAdapter,
     private readonly mockAdapter: MockAiAdapter,
     private readonly deepgramAdapter: DeepgramAdapter,
   ) {
@@ -45,15 +47,18 @@ export class ProviderRegistryService {
     this.llmProviders.set(this.mockAdapter.name, this.mockAdapter);
 
     // Realtime Voice Providers
+    this.realtimeProviders.set(
+      this.geminiRealtimeAdapter.name,
+      this.geminiRealtimeAdapter,
+    );
     this.realtimeProviders.set(this.mockAdapter.name, this.mockAdapter);
-    // (Gemini Live realtime WebSocket adapter will be wired in Phase 5)
 
     // Evaluation Providers
     this.evaluationProviders.set(this.geminiAdapter.name, this.geminiAdapter);
     this.evaluationProviders.set(this.mockAdapter.name, this.mockAdapter);
 
     this.logger.log(
-      `AI Provider Registry initialized with [${Array.from(this.llmProviders.keys()).join(', ')}]`,
+      `AI Provider Registry initialized with LLM: [${Array.from(this.llmProviders.keys()).join(', ')}], Realtime: [${Array.from(this.realtimeProviders.keys()).join(', ')}]`,
     );
   }
 
@@ -93,7 +98,10 @@ export class ProviderRegistryService {
       .get<string>('REALTIME_PROVIDER', 'mock')
       .toLowerCase();
     const provider = this.realtimeProviders.get(configuredName);
-    return provider ?? this.mockAdapter;
+    if (provider && provider.isConfigured) {
+      return provider;
+    }
+    return this.mockAdapter;
   }
 
   /**

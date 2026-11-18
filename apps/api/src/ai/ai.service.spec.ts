@@ -3,6 +3,7 @@ import { ProviderRegistryService } from './provider-registry.service.js';
 import { AiService } from './ai.service.js';
 import { MockAiAdapter } from './adapters/mock-ai.adapter.js';
 import { GeminiLlmAdapter } from './adapters/gemini-llm.adapter.js';
+import { GeminiRealtimeAdapter } from './adapters/gemini-realtime.adapter.js';
 import { DeepgramAdapter } from './adapters/deepgram.adapter.js';
 import type { ConfigService } from '@nestjs/config';
 import {
@@ -14,6 +15,7 @@ import {
 describe('AI Provider Abstraction Layer', () => {
   let mockAdapter: MockAiAdapter;
   let geminiAdapter: GeminiLlmAdapter;
+  let geminiRealtimeAdapter: GeminiRealtimeAdapter;
   let deepgramAdapter: DeepgramAdapter;
   let registryService: ProviderRegistryService;
   let aiService: AiService;
@@ -33,11 +35,15 @@ describe('AI Provider Abstraction Layer', () => {
 
     mockAdapter = new MockAiAdapter();
     geminiAdapter = new GeminiLlmAdapter(mockConfigService as ConfigService);
+    geminiRealtimeAdapter = new GeminiRealtimeAdapter(
+      mockConfigService as ConfigService,
+    );
     deepgramAdapter = new DeepgramAdapter(mockConfigService as ConfigService);
 
     registryService = new ProviderRegistryService(
       mockConfigService as ConfigService,
       geminiAdapter,
+      geminiRealtimeAdapter,
       mockAdapter,
       deepgramAdapter,
     );

@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module.js';
 import { CandidatesModule } from './candidates/candidates.module.js';
 import { TracksModule } from './tracks/tracks.module.js';
 import { AiModule } from './ai/ai.module.js';
+import { InterviewModule } from './interview/interview.module.js';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AiModule } from './ai/ai.module.js';
     CandidatesModule,
     TracksModule,
     AiModule,
+    InterviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],

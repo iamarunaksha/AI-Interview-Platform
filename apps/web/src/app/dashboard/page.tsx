@@ -49,8 +49,21 @@ export default function DashboardPage() {
 
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
+              href="/interview/new"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-xs font-semibold shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5"
+            >
+              <span>🎙️</span>
+              <span>Start Voice Interview</span>
+            </Link>
+            <Link
+              href="/tracks"
+              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 transition-colors"
+            >
+              Question Bank
+            </Link>
+            <Link
               href="/onboarding"
-              className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 transition-colors"
             >
               Modify Track Settings
             </Link>

@@ -219,6 +219,45 @@ export interface InterviewSession {
   createdAt: string;
 }
 
+export interface TranscriptTurn {
+  id: string;
+  role: MessageRole;
+  text: string;
+  timestamp: number;
+}
+
+export interface CreateInterviewSessionRequest {
+  domain?: ProfessionalDomain;
+  companyCategory?: CompanyCategory;
+  targetRole?: string;
+  experienceLevel?: ExperienceLevel;
+  difficulty?: InterviewDifficulty;
+  durationMinutes?: number;
+  personality?: InterviewerPersonality;
+  mode?: InterviewMode;
+  questionId?: string;
+}
+
+export interface InterviewSessionResponse {
+  id: string;
+  candidateId: string;
+  domain: ProfessionalDomain;
+  companyCategory: CompanyCategory;
+  targetRole: string;
+  experienceLevel: ExperienceLevel;
+  difficulty: InterviewDifficulty;
+  durationMinutes: number;
+  personality: InterviewerPersonality;
+  mode: InterviewMode;
+  status: InterviewStatus;
+  currentQuestion?: QuestionResponse | null;
+  transcript: TranscriptTurn[];
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ---- Conversation Event Types ----
 // These are the canonical events that flow over WebSocket.
 // Every AI provider adapter normalizes its events into these.

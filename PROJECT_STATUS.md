@@ -1,8 +1,8 @@
 # Project Status: AI Interview Platform
 
 **Last Updated:** 2026-11-18  
-**Current Phase:** Phase 4: AI Provider Abstraction Layer  
-**Phase Status:** COMPLETED  
+**Current Phase:** Phase 5: Voice Interview MVP  
+**Phase Status:** COMPLETED
 
 ---
 
@@ -15,8 +15,8 @@
 | Phase 2  | Authentication and Candidate Onboarding   | **COMPLETED**          |
 | Phase 3  | Interview Track and Question Bank Engine  | **COMPLETED**          |
 | Phase 4  | AI Provider Abstraction Layer             | **COMPLETED**          |
-| Phase 5  | Voice Interview MVP                       | **NEXT (NOT_STARTED)** |
-| Phase 6  | Interview Orchestrator                    | NOT_STARTED            |
+| Phase 5  | Voice Interview MVP                       | **COMPLETED**          |
+| Phase 6  | Interview Orchestrator                    | **NEXT (NOT_STARTED)** |
 | Phase 7  | Evidence Collection Engine                | NOT_STARTED            |
 | Phase 8  | Independent Evaluation Engine             | NOT_STARTED            |
 | Phase 9  | Interview Reports and Candidate Dashboard | NOT_STARTED            |
@@ -29,47 +29,58 @@
 
 ---
 
-## 2. Completed Milestones (Phase 4 Acceptance Criteria)
+## 2. Completed Milestones (Phase 5 Acceptance Criteria)
 
-- [x] Defined provider-agnostic interfaces in NestJS:
-  - `ILlmProvider` (`generateText`, `generateChat`, `streamChat`, `testConnection`)
-  - `IRealtimeVoiceProvider` (`createSession`, `sendAudio`, `sendText`, `interrupt`, `close`, `onEvent`)
-  - `IEvaluationProvider` (`evaluateSession` producing typed `InterviewReport`)
-- [x] Implemented production `GeminiLlmAdapter` using official Google Gen AI SDK (`@google/genai`):
-  - Gemini 2.0 Flash (`gemini-2.0-flash`) support
-  - Single-prompt, multi-turn chat, and token streaming
-  - Structured JSON evaluation generation
-  - Graceful fallback to `MockAiAdapter` when `GEMINI_API_KEY` is omitted
-- [x] Implemented `MockAiAdapter`:
-  - 100% offline, zero-cost, deterministic simulator for development and CI/CD
-  - Realistic follow-ups, streaming chunks, turn-completion events, and 4-point rubric evaluation
-- [x] Implemented `DeepgramAdapter`:
-  - Fallback STT (`nova-2`) and TTS (`aura`) interface integration
-- [x] Implemented `ProviderRegistryService`:
-  - Dynamic provider selection via environment variables (`LLM_PROVIDER`, `REALTIME_PROVIDER`, `EVALUATION_PROVIDER`)
-  - Capability matrix, availability checks, and status reporting
-- [x] Exposed RESTful APIs:
-  - `GET  /api/ai/providers` (returns active selections, model names, and connection states)
-  - `POST /api/ai/test-generate` (runs test generation and reports latency in ms)
-- [x] Updated `@interviewai/shared-types` with:
-  - `ChatMessage`, `LlmGenerateOptions`, `LlmGenerateResult`, `AiProviderInfo`, `AiSystemStatusResponse`, `TestGenerateRequest`, `TestGenerateResponse`
-- [x] Frontend AI Provider Inspector (`AiProviderStatusCard` on `/dashboard`):
-  - Live active provider status badges (LLM, Voice, STT, Evaluator)
-  - Interactive generation test form with real-time response and latency measurement
-- [x] Quality Gates & Verification:
-  - Vitest 20/20 tests passing (5 test suites)
+- [x] Installed and configured WebSocket infrastructure:
+  - `@nestjs/websockets`, `@nestjs/platform-socket.io`, `socket.io` in API
+  - `socket.io-client` in Web
+- [x] Implemented production `GeminiRealtimeAdapter`:
+  - Implements `IRealtimeVoiceProvider` via `@google/genai` Live API (`ai.live.connect`)
+  - Automatic fallback to deterministic `MockAiAdapter` when unconfigured or offline
+- [x] Created `InterviewSessionEntity` in PostgreSQL:
+  - Maps `interview_sessions` table with candidate relation, track metadata, question reference, and JSON persistent transcript
+- [x] Implemented `InterviewService`:
+  - Session CRUD, status lifecycle (`CREATED` -> `IN_PROGRESS` -> `PAUSED` -> `COMPLETED`)
+  - Real-time session bridge dispatcher wiring AI events to client sockets & auto-recording persistent transcript turns
+  - Interruption and pause management
+- [x] Implemented `InterviewGateway` (`/interview` WebSocket namespace):
+  - `session.join` room attachment with instant `session.ready` handshake
+  - Full-duplex `audio.chunk` forwarding (binary PCM buffer)
+  - Text fallback messaging (`message.send`)
+  - `interview.interrupt`, `interview.pause`, and `interview.end` event lifecycles
+- [x] Exposed RESTful API routes (`InterviewController` at `/api/interviews`):
+  - `POST /api/interviews` (create interview session)
+  - `GET  /api/interviews` (list candidate interviews)
+  - `GET  /api/interviews/:id` (fetch session details)
+  - `POST /api/interviews/:id/start` (start session)
+  - `POST /api/interviews/:id/end` (end session)
+  - `GET  /api/interviews/:id/transcript` (fetch recorded transcript)
+- [x] Built Browser Audio Capture & Playback Pipelines:
+  - `AudioRecorderPipeline`: microphone capture (16kHz mono), RMS volume calculations for dynamic waveform visualization, 250ms audio chunk slicing
+  - `AudioPlayerPipeline`: Web Audio API PCM chunk playback + Web Speech API synthesis fallback
+- [x] Built Interactive Voice Interview Room UI:
+  - `/interview/new`: track and role configuration launcher
+  - `/interview/[id]`: live interview room with responsive layout
+  - `InterviewHeader`: difficulty badge, live status indicator, elapsed duration timer
+  - `InterviewAudioVisualizer`: dynamic waveform reacting to mic input volume & AI speech
+  - `InterviewQuestionCard`: problem stem, expected concepts, collapsible hints
+  - `InterviewTranscript`: auto-scrolling conversation feed with role badges & timestamps
+  - `InterviewControls`: mic mute/unmute, interruption button, pause/resume, and expandable text chat
+- [x] Verification & Automated Tests:
+  - 30/30 unit tests passing (7 test suites including `InterviewService` and `InterviewGateway`)
   - 4/4 TypeScript type-checks passing with 0 errors
-  - 3/3 Turborepo packages building cleanly
+  - 3/3 Turborepo packages building cleanly (11 static/hybrid Next.js routes)
   - Prettier 100% compliant & Linters (Oxlint + ESLint) passing with 0 warnings/errors
+  - Live end-to-end WebSocket loop verified against Supabase PostgreSQL
 
 ---
 
 ## 3. Latest Verification Results
 
-- **Shared Types:** Type-check passed (Clean `tsc` compilation to `dist/`)
-- **API (NestJS):** Vitest 20/20 tests passed (`AiService`, `TracksService`, `AuthService`, `CandidatesService`, `AppController`)
-- **Web (Next.js):** Build successful (`next build --webpack`, static page generation passed for 9 routes)
-- **Live AI Endpoints:** `/api/ai/providers` and `/api/ai/test-generate` verified with live latency benchmarking
+- **Shared Types:** Type-check passed (Compiles to `dist/`)
+- **API (NestJS):** Vitest 30/30 tests passed (`InterviewService`, `InterviewGateway`, `AiService`, `TracksService`, `AuthService`, `CandidatesService`, `AppController`)
+- **Web (Next.js):** Build successful (`next build --webpack`, static/hybrid page generation passed for 11 routes)
+- **Live WebSocket End-to-End:** Handshake, join, message streaming, assistant speech, and persistent transcript confirmed in Supabase PostgreSQL
 - **Linters:** Oxlint (API) & ESLint (Web) passed with 0 errors and 0 warnings
 - **Prettier:** 100% compliant (`pnpm format:check`)
 
@@ -77,8 +88,8 @@
 
 ## 4. Next Recommended Action
 
-**Commence Phase 5: Voice Interview MVP**
-1. Set up WebSocket Gateway (`InterviewGateway`) in NestJS using `@nestjs/websockets`.
-2. Connect WebSocket to `IRealtimeVoiceProvider` session.
-3. Build browser audio capture (`MediaRecorder` / Web Audio API PCM pipeline) and audio playback streamer.
-4. Test live bidirectional voice interview loop end-to-end.
+**Commence Phase 6: Interview Orchestrator**
+
+1. Implement finite state machine (FSM) for interview flow: Greeting -> Problem Framing -> Probing -> Deep Dive -> Conclusion.
+2. Build Context Injection engine to dynamically pass rubric criteria and probing paths to the LLM.
+3. Manage time budgets and automatic transition triggers.
