@@ -11,6 +11,7 @@ import { AiModule } from '../ai/ai.module.js';
 import { TracksModule } from '../tracks/tracks.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { EvidenceModule } from '../evidence/evidence.module.js';
+import { CodingModule } from '../coding/coding.module.js';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { EvidenceModule } from '../evidence/evidence.module.js';
     TracksModule,
     AuthModule,
     EvidenceModule,
+    CodingModule,
   ],
   providers: [
     InterviewService,

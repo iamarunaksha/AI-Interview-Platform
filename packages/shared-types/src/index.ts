@@ -605,3 +605,74 @@ export interface TestGenerateResponse {
   output: string;
   latencyMs: number;
 }
+
+// ---- Phase 10: Coding Interview Types ----
+
+export enum ProgrammingLanguage {
+  TYPESCRIPT = "typescript",
+  JAVASCRIPT = "javascript",
+  PYTHON = "python",
+  JAVA = "java",
+  GO = "go",
+  CPP = "cpp",
+}
+
+export enum CodeExecutionStatus {
+  PASSED = "PASSED",
+  FAILED = "FAILED",
+  TIMED_OUT = "TIMED_OUT",
+  COMPILE_ERROR = "COMPILE_ERROR",
+  RUNTIME_ERROR = "RUNTIME_ERROR",
+}
+
+export interface TestCase {
+  id: string;
+  input: unknown;
+  expectedOutput: unknown;
+  description?: string;
+  isHidden?: boolean;
+}
+
+export interface TestCaseResult {
+  id: string;
+  description?: string;
+  input: unknown;
+  expectedOutput: unknown;
+  actualOutput: unknown;
+  passed: boolean;
+  executionTimeMs: number;
+  error?: string;
+  stdout?: string;
+}
+
+export interface CodeExecutionResult {
+  language: ProgrammingLanguage;
+  status: CodeExecutionStatus;
+  totalTests: number;
+  passedTests: number;
+  runtimeMs: number;
+  memoryMb?: number;
+  results: TestCaseResult[];
+  compilerOutput?: string;
+  interviewerContextNote?: string;
+}
+
+export interface CodeRunRequest {
+  sessionId?: string;
+  code: string;
+  language: ProgrammingLanguage;
+  testCases?: TestCase[];
+  entryFunction?: string;
+}
+
+export interface CodingProblem {
+  id: string;
+  title: string;
+  difficulty: InterviewDifficulty;
+  description: string;
+  examples: Array<{ input: string; output: string; explanation?: string }>;
+  constraints: string[];
+  starterCode: Partial<Record<ProgrammingLanguage, string>>;
+  testCases: TestCase[];
+  entryFunction: string;
+}

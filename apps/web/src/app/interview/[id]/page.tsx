@@ -15,6 +15,7 @@ import { InterviewTranscript } from "@/components/interview/interview-transcript
 import { InterviewControls } from "@/components/interview/interview-controls";
 import { InterviewEvidencePanel } from "@/components/interview/interview-evidence-panel";
 import { InterviewEvaluationCard } from "@/components/interview/interview-evaluation-card";
+import { InterviewCodeEditor } from "@/components/interview/interview-code-editor";
 import {
   InterviewStatus,
   InterviewStage,
@@ -25,6 +26,8 @@ import {
   type OrchestratorState,
   type EvidenceRecord,
   type InterviewReport,
+  type CodeExecutionResult,
+  type ProgrammingLanguage,
 } from "@interviewai/shared-types";
 
 interface PageProps {
@@ -52,6 +55,14 @@ export default function InterviewRoomPage({ params }: PageProps) {
   const [evaluationReport, setEvaluationReport] =
     useState<InterviewReport | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
+
+  // Coding environment state
+  const [viewMode, setViewMode] = useState<"voice" | "coding" | "split">(
+    "voice",
+  );
+  const [codeExecutionResult, setCodeExecutionResult] =
+    useState<CodeExecutionResult | null>(null);
+  const [isExecutingCode, setIsExecutingCode] = useState(false);
 
   // Audio state
   const [micVolume, setMicVolume] = useState(0);
@@ -271,6 +282,17 @@ export default function InterviewRoomPage({ params }: PageProps) {
       onEvent: (event: ConversationEvent) => {
         handleSocketEvent(event);
       },
+      onCodeResult: (result: CodeExecutionResult) => {
+        setCodeExecutionResult(result);
+        setIsExecutingCode(false);
+      },
+      onCodeStatus: (status: { status: string; message?: string }) => {
+        if (status.status === "running") {
+          setIsExecutingCode(true);
+        } else {
+          setIsExecutingCode(false);
+        }
+      },
       onError: (err) => {
         console.error("WebSocket interview error:", err);
       },
@@ -334,6 +356,19 @@ export default function InterviewRoomPage({ params }: PageProps) {
         timestamp: Date.now(),
       },
     ]);
+  };
+
+  const handleCodeChange = (code: string, language: ProgrammingLanguage) => {
+    interviewSocket.sendCodeChange(code, language);
+  };
+
+  const handleCodeRun = (
+    code: string,
+    language: ProgrammingLanguage,
+    problemId?: string,
+  ) => {
+    setIsExecutingCode(true);
+    interviewSocket.runCode(code, language, problemId);
   };
 
   const handleEndInterview = async () => {
@@ -441,81 +476,235 @@ export default function InterviewRoomPage({ params }: PageProps) {
         />
       </div>
 
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Question stem & Audio Visualizer (5 cols) */}
-        <div className="lg:col-span-5 space-y-6 flex flex-col">
-          <InterviewQuestionCard question={session.currentQuestion ?? null} />
+      {/* Mode Switcher: Voice vs Coding vs Split */}
+      <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 pt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setViewMode("voice")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              viewMode === "voice"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <span>🎙️</span>
+            <span>Voice & Discussion</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("coding")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              viewMode === "coding"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <span>💻</span>
+            <span>Live Code Editor</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("split")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              viewMode === "split"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <span>⚡</span>
+            <span>Split View</span>
+          </button>
+        </div>
 
-          <InterviewConceptTracker
-            coveredConcepts={
-              orchestratorState?.coveredConcepts ??
-              session.coveredConcepts ??
-              []
-            }
-            remainingConcepts={
-              orchestratorState?.remainingConcepts ??
-              session.currentQuestion?.expectedConcepts ??
-              []
-            }
-            activeProbingQuestion={
-              orchestratorState?.activeProbingQuestion ?? null
-            }
+        {/* Live Audio State Pill */}
+        <div className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900/60 px-3 py-1.5 rounded-xl border border-zinc-800/80">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              isMicActive ? "bg-emerald-400 animate-pulse" : "bg-zinc-600"
+            }`}
           />
-
-          <InterviewAudioVisualizer
-            micVolume={micVolume}
-            isAssistantSpeaking={isAssistantSpeaking}
-            isMicActive={isMicActive}
-          />
-
-          {session.status === InterviewStatus.COMPLETED && (
-            <div className="p-6 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-center space-y-3">
-              <div className="text-sm font-semibold text-indigo-300">
-                🎉 Interview Session Concluded
-              </div>
-              <p className="text-xs text-zinc-400">
-                Your full transcript has been recorded. You can review the
-                transcript or start another mock session.
-              </p>
-              <Link
-                href="/dashboard"
-                className="inline-block px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
-              >
-                Back to Dashboard
-              </Link>
-            </div>
+          <span>{isMicActive ? "Live Audio Active" : "Microphone Muted"}</span>
+          {isAssistantSpeaking && (
+            <span className="text-indigo-400 text-[11px] font-medium flex items-center gap-1">
+              <span className="animate-spin">🌀</span> AI Speaking
+            </span>
           )}
         </div>
+      </div>
 
-        {/* Right Column: Live Transcript & Voice Controls (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-4">
-          <InterviewTranscript
-            transcript={transcript}
-            streamingDelta={streamingDelta}
-            streamingRole={streamingRole}
-          />
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        {/* VIEW MODE: VOICE & DISCUSSION */}
+        {viewMode === "voice" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column: Question stem & Audio Visualizer (5 cols) */}
+            <div className="lg:col-span-5 space-y-6 flex flex-col">
+              <InterviewQuestionCard
+                question={session.currentQuestion ?? null}
+              />
 
-          <InterviewControls
-            isMicActive={isMicActive}
-            isSpeakerMuted={isSpeakerMuted}
-            isAssistantSpeaking={isAssistantSpeaking}
-            isPaused={isPaused}
-            onToggleMic={handleToggleMic}
-            onToggleSpeaker={handleToggleSpeaker}
-            onInterrupt={handleInterrupt}
-            onTogglePause={handleTogglePause}
-            onSendText={handleSendText}
-          />
+              <InterviewConceptTracker
+                coveredConcepts={
+                  orchestratorState?.coveredConcepts ??
+                  session.coveredConcepts ??
+                  []
+                }
+                remainingConcepts={
+                  orchestratorState?.remainingConcepts ??
+                  session.currentQuestion?.expectedConcepts ??
+                  []
+                }
+                activeProbingQuestion={
+                  orchestratorState?.activeProbingQuestion ?? null
+                }
+              />
 
-          <InterviewEvidencePanel
-            evidence={evidence}
-            onBatchExtract={handleBatchExtract}
-            isExtracting={isExtractingEvidence}
-          />
-        </div>
+              <InterviewAudioVisualizer
+                micVolume={micVolume}
+                isAssistantSpeaking={isAssistantSpeaking}
+                isMicActive={isMicActive}
+              />
+
+              {session.status === InterviewStatus.COMPLETED && (
+                <div className="p-6 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-center space-y-3">
+                  <div className="text-sm font-semibold text-indigo-300">
+                    🎉 Interview Session Concluded
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Your full transcript has been recorded. You can review the
+                    transcript or view your evaluation report.
+                  </p>
+                  <Link
+                    href={`/interview/${session.id}/report`}
+                    className="inline-block px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
+                  >
+                    View Official Report
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Live Transcript & Voice Controls (7 cols) */}
+            <div className="lg:col-span-7 flex flex-col gap-4">
+              <InterviewTranscript
+                transcript={transcript}
+                streamingDelta={streamingDelta}
+                streamingRole={streamingRole}
+              />
+
+              <InterviewControls
+                isMicActive={isMicActive}
+                isSpeakerMuted={isSpeakerMuted}
+                isAssistantSpeaking={isAssistantSpeaking}
+                isPaused={isPaused}
+                onToggleMic={handleToggleMic}
+                onToggleSpeaker={handleToggleSpeaker}
+                onInterrupt={handleInterrupt}
+                onTogglePause={handleTogglePause}
+                onSendText={handleSendText}
+              />
+
+              <InterviewEvidencePanel
+                evidence={evidence}
+                onBatchExtract={handleBatchExtract}
+                isExtracting={isExtractingEvidence}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* VIEW MODE: CODING ENVIRONMENT */}
+        {viewMode === "coding" && (
+          <div className="space-y-4">
+            {/* Compact Audio Strip in Coding Mode */}
+            <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <InterviewAudioVisualizer
+                  micVolume={micVolume}
+                  isAssistantSpeaking={isAssistantSpeaking}
+                  isMicActive={isMicActive}
+                />
+              </div>
+
+              <div className="flex-1 max-w-md">
+                <InterviewControls
+                  isMicActive={isMicActive}
+                  isSpeakerMuted={isSpeakerMuted}
+                  isAssistantSpeaking={isAssistantSpeaking}
+                  isPaused={isPaused}
+                  onToggleMic={handleToggleMic}
+                  onToggleSpeaker={handleToggleSpeaker}
+                  onInterrupt={handleInterrupt}
+                  onTogglePause={handleTogglePause}
+                  onSendText={handleSendText}
+                />
+              </div>
+            </div>
+
+            {/* Full-Width Code Editor */}
+            <div className="min-h-[580px]">
+              <InterviewCodeEditor
+                sessionId={session.id}
+                onCodeChange={handleCodeChange}
+                onCodeRun={handleCodeRun}
+                latestExecutionResult={codeExecutionResult}
+                isExecuting={isExecutingCode}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* VIEW MODE: SPLIT VIEW */}
+        {viewMode === "split" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column: Monaco Code Editor (7 cols) */}
+            <div className="lg:col-span-7 flex flex-col min-h-[580px]">
+              <InterviewCodeEditor
+                sessionId={session.id}
+                onCodeChange={handleCodeChange}
+                onCodeRun={handleCodeRun}
+                latestExecutionResult={codeExecutionResult}
+                isExecuting={isExecutingCode}
+              />
+            </div>
+
+            {/* Right Column: Audio & Transcript (5 cols) */}
+            <div className="lg:col-span-5 flex flex-col gap-4">
+              <InterviewAudioVisualizer
+                micVolume={micVolume}
+                isAssistantSpeaking={isAssistantSpeaking}
+                isMicActive={isMicActive}
+              />
+
+              <InterviewControls
+                isMicActive={isMicActive}
+                isSpeakerMuted={isSpeakerMuted}
+                isAssistantSpeaking={isAssistantSpeaking}
+                isPaused={isPaused}
+                onToggleMic={handleToggleMic}
+                onToggleSpeaker={handleToggleSpeaker}
+                onInterrupt={handleInterrupt}
+                onTogglePause={handleTogglePause}
+                onSendText={handleSendText}
+              />
+
+              <InterviewTranscript
+                transcript={transcript}
+                streamingDelta={streamingDelta}
+                streamingRole={streamingRole}
+              />
+
+              <InterviewEvidencePanel
+                evidence={evidence}
+                onBatchExtract={handleBatchExtract}
+                isExtracting={isExtractingEvidence}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Full-Width Bottom Section: Independent Rubric Evaluation */}
-        <div className="lg:col-span-12">
+        <div className="w-full">
           <InterviewEvaluationCard
             report={evaluationReport}
             isEvaluating={isEvaluating}

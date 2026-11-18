@@ -24,6 +24,9 @@ import {
   type InterviewReport,
   type ComprehensiveInterviewReport,
   type CandidateDashboardMetrics,
+  type CodingProblem,
+  type CodeExecutionResult,
+  type CodeRunRequest,
 } from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -350,6 +353,27 @@ export const api = {
 
     getDashboardMetrics: async (): Promise<CandidateDashboardMetrics> => {
       return apiFetch<CandidateDashboardMetrics>("/api/reports/dashboard");
+    },
+  },
+
+  coding: {
+    listProblems: async (): Promise<CodingProblem[]> => {
+      return apiFetch<CodingProblem[]>("/api/coding/problems");
+    },
+
+    getProblem: async (problemId: string): Promise<CodingProblem> => {
+      return apiFetch<CodingProblem>(`/api/coding/problems/${problemId}`);
+    },
+
+    execute: async (
+      request: CodeRunRequest,
+      problemId?: string,
+    ): Promise<CodeExecutionResult> => {
+      const qs = problemId ? `?problemId=${encodeURIComponent(problemId)}` : "";
+      return apiFetch<CodeExecutionResult>(`/api/coding/execute${qs}`, {
+        method: "POST",
+        body: JSON.stringify(request),
+      });
     },
   },
 };

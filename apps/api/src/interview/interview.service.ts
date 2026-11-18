@@ -26,8 +26,11 @@ import {
   type ConversationEvent,
   type TranscriptTurn,
   type InterviewSessionResponse,
+  type ProgrammingLanguage,
+  type CodeExecutionResult,
 } from '@interviewai/shared-types';
 import type { CreateInterviewSessionDto } from './dto/create-interview.dto.js';
+import { CodingService } from '../coding/coding.service.js';
 
 @Injectable()
 export class InterviewService {
@@ -36,6 +39,10 @@ export class InterviewService {
   private readonly sessionEventCallbacks = new Map<
     string,
     (event: ConversationEvent) => void
+  >();
+  private readonly sessionCodeMap = new Map<
+    string,
+    { code: string; language: string }
   >();
 
   constructor(
@@ -47,6 +54,8 @@ export class InterviewService {
     private readonly orchestrator: InterviewOrchestratorService,
     @Optional()
     private readonly evidenceService?: EvidenceService,
+    @Optional()
+    private readonly codingService?: CodingService,
   ) {}
 
   /**
@@ -242,8 +251,9 @@ export class InterviewService {
         });
 
         // Trigger orchestrator stage & concept evaluation
+        const currentCode = this.getSessionCode(session.id);
         void this.orchestrator
-          .processCandidateTurn(session, event.text)
+          .processCandidateTurn(session, event.text, currentCode)
           .then((orchResult) => {
             if (orchResult.transition) {
               onEvent({
@@ -334,9 +344,11 @@ export class InterviewService {
 
       // Advance orchestrator for text turn
       const session = await this.getSession(sessionId);
+      const currentCode = this.getSessionCode(sessionId);
       const orchResult = await this.orchestrator.processCandidateTurn(
         session,
         text,
+        currentCode,
       );
       const callback = this.sessionEventCallbacks.get(sessionId);
       if (callback) {
@@ -471,5 +483,51 @@ export class InterviewService {
       createdAt: session.createdAt.toISOString(),
       updatedAt: session.updatedAt.toISOString(),
     };
+  }
+
+  /**
+   * Update active code editor state for a session.
+   */
+  updateSessionCode(sessionId: string, code: string, language: string): void {
+    this.sessionCodeMap.set(sessionId, { code, language });
+  }
+
+  /**
+   * Retrieve active code editor state for a session.
+   */
+  getSessionCode(
+    sessionId: string,
+  ): { code: string; language: string } | undefined {
+    return this.sessionCodeMap.get(sessionId);
+  }
+
+  /**
+   * Execute code in sandbox and inform the live interviewer bridge of results.
+   */
+  async executeSessionCode(
+    sessionId: string,
+    data: {
+      code: string;
+      language: ProgrammingLanguage;
+      problemId?: string;
+    },
+  ): Promise<CodeExecutionResult> {
+    this.updateSessionCode(sessionId, data.code, data.language);
+
+    if (!this.codingService) {
+      throw new Error('CodingService is not available in InterviewService');
+    }
+
+    const result = await this.codingService.runCode(data, data.problemId);
+
+    // Notify active AI interviewer session of test run outcomes
+    const bridge = this.activeRealtimeSessions.get(sessionId);
+    if (bridge && result.interviewerContextNote) {
+      void bridge.sendText(
+        `[Candidate Test Execution Event: ${result.interviewerContextNote}]`,
+      );
+    }
+
+    return result;
   }
 }

@@ -118,6 +118,7 @@ export class InterviewOrchestratorService {
   async processCandidateTurn(
     session: InterviewSessionEntity,
     candidateTranscript: string,
+    activeCode?: { code: string; language: string } | null,
   ): Promise<TurnOrchestrationResult> {
     const state = this.initSession(session);
     state.turnCount += 1;
@@ -188,6 +189,7 @@ export class InterviewOrchestratorService {
       remainingConcepts: state.remainingConcepts,
       activeProbing: state.activeProbingQuestion,
       remainingMinutes,
+      activeCode,
     });
 
     return {

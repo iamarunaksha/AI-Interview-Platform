@@ -1,6 +1,9 @@
 import { io, Socket } from "socket.io-client";
 import { getStoredAccessToken } from "./api-client";
-import type { ConversationEvent } from "@interviewai/shared-types";
+import type {
+  ConversationEvent,
+  CodeExecutionResult,
+} from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -18,6 +21,8 @@ export class InterviewSocketClient {
       onEvent?: (event: ConversationEvent) => void;
       onError?: (err: { code: string; message: string }) => void;
       onDisconnect?: () => void;
+      onCodeResult?: (result: CodeExecutionResult) => void;
+      onCodeStatus?: (status: { status: string; message?: string }) => void;
     },
   ): Socket {
     if (this.socket && this.socket.connected && this.sessionId === sessionId) {
@@ -53,6 +58,17 @@ export class InterviewSocketClient {
       callbacks?.onEvent?.(event);
     });
 
+    this.socket.on("code.result", (result: CodeExecutionResult) => {
+      callbacks?.onCodeResult?.(result);
+    });
+
+    this.socket.on(
+      "code.status",
+      (status: { status: string; message?: string }) => {
+        callbacks?.onCodeStatus?.(status);
+      },
+    );
+
     this.socket.on(
       "session.error",
       (err: { code: string; message: string }) => {
@@ -81,6 +97,25 @@ export class InterviewSocketClient {
     this.socket.emit("message.send", {
       sessionId: this.sessionId,
       text,
+    });
+  }
+
+  sendCodeChange(code: string, language: string): void {
+    if (!this.socket || !this.isConnected || !this.sessionId) return;
+    this.socket.emit("code.change", {
+      sessionId: this.sessionId,
+      code,
+      language,
+    });
+  }
+
+  runCode(code: string, language: string, problemId?: string): void {
+    if (!this.socket || !this.isConnected || !this.sessionId) return;
+    this.socket.emit("code.run", {
+      sessionId: this.sessionId,
+      code,
+      language,
+      problemId,
     });
   }
 

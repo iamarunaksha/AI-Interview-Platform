@@ -16,6 +16,7 @@ export interface ContextInjectionParams {
   remainingConcepts: string[];
   activeProbing?: ProbingQuestion | null;
   remainingMinutes?: number;
+  activeCode?: { code: string; language: string } | null;
 }
 
 @Injectable()
@@ -33,6 +34,7 @@ export class ContextInjectorService {
       remainingConcepts,
       activeProbing,
       remainingMinutes,
+      activeCode,
     } = params;
 
     const roleProfile = `You are a Principal Engineering Interviewer conducting a live adaptive interview for a ${session.experienceLevel} candidate targeting the role of "${session.targetRole}".`;
@@ -47,6 +49,15 @@ export class ContextInjectorService {
       remainingConcepts,
       activeProbing,
     );
+
+    const codeContext =
+      activeCode && activeCode.code.trim().length > 0
+        ? `Candidate Live Code Buffer (${activeCode.language}):
+\`\`\`${activeCode.language}
+${activeCode.code.slice(0, 1500)}
+\`\`\`
+Note: The candidate is actively editing this code in their coding environment. Reference their variables, algorithmic structure, edge cases, and time/space complexity where appropriate.`
+        : '';
 
     const timingConstraint =
       remainingMinutes !== undefined
@@ -65,6 +76,7 @@ export class ContextInjectorService {
       personalityDirective,
       modeDirective,
       stageDirective,
+      codeContext,
       conceptsSummary,
       timingConstraint,
       `Core Ground Rules:

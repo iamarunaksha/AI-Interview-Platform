@@ -11,7 +11,10 @@ import {
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { InterviewService } from './interview.service.js';
-import type { ConversationEvent } from '@interviewai/shared-types';
+import type {
+  ConversationEvent,
+  ProgrammingLanguage,
+} from '@interviewai/shared-types';
 
 @WebSocketGateway({
   cors: {
@@ -205,5 +208,64 @@ export class InterviewGateway
       status: updated.status,
       timestamp: Date.now(),
     });
+  }
+
+  /**
+   * Handle candidate code editor content updates.
+   */
+  @SubscribeMessage('code.change')
+  handleCodeChange(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId?: string; code: string; language: string },
+  ) {
+    const sessionId = data.sessionId || this.socketSessionMap.get(client.id);
+    if (!sessionId || data.code === undefined) return;
+
+    this.interviewService.updateSessionCode(
+      sessionId,
+      data.code,
+      data.language || 'typescript',
+    );
+  }
+
+  /**
+   * Handle candidate code execution request in the sandbox.
+   */
+  @SubscribeMessage('code.run')
+  async handleCodeRun(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      sessionId?: string;
+      code: string;
+      language: ProgrammingLanguage;
+      problemId?: string;
+    },
+  ) {
+    const sessionId = data.sessionId || this.socketSessionMap.get(client.id);
+    if (!sessionId || !data.code) return;
+
+    client.emit('code.status', {
+      status: 'running',
+      message: 'Running code in sandbox against test suites...',
+      timestamp: Date.now(),
+    });
+
+    try {
+      const result = await this.interviewService.executeSessionCode(sessionId, {
+        code: data.code,
+        language: data.language,
+        problemId: data.problemId,
+      });
+
+      client.emit('code.result', result);
+    } catch (err) {
+      client.emit('code.status', {
+        status: 'error',
+        message:
+          err instanceof Error ? err.message : 'Execution failed in sandbox',
+        timestamp: Date.now(),
+      });
+    }
   }
 }

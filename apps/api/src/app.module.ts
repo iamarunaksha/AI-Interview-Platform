@@ -12,12 +12,13 @@ import { InterviewModule } from './interview/interview.module.js';
 import { EvidenceModule } from './evidence/evidence.module.js';
 import { EvaluationModule } from './evaluation/evaluation.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { CodingModule } from './coding/coding.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', '.env.local'],
+      envFilePath: ['apps/api/.env', '.env', '.env.local'],
     }),
     DatabaseModule,
     UsersModule,
@@ -29,6 +30,7 @@ import { ReportsModule } from './reports/reports.module.js';
     EvidenceModule,
     EvaluationModule,
     ReportsModule,
+    CodingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
