@@ -13,6 +13,7 @@ import { InterviewQuestionCard } from "@/components/interview/interview-question
 import { InterviewAudioVisualizer } from "@/components/interview/interview-audio-visualizer";
 import { InterviewTranscript } from "@/components/interview/interview-transcript";
 import { InterviewControls } from "@/components/interview/interview-controls";
+import { InterviewEvidencePanel } from "@/components/interview/interview-evidence-panel";
 import {
   InterviewStatus,
   InterviewStage,
@@ -21,6 +22,7 @@ import {
   type TranscriptTurn,
   type ConversationEvent,
   type OrchestratorState,
+  type EvidenceRecord,
 } from "@interviewai/shared-types";
 
 interface PageProps {
@@ -39,6 +41,10 @@ export default function InterviewRoomPage({ params }: PageProps) {
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [streamingDelta, setStreamingDelta] = useState<string | null>(null);
   const [streamingRole, setStreamingRole] = useState<MessageRole | null>(null);
+
+  // Evidence Collection State
+  const [evidence, setEvidence] = useState<EvidenceRecord[]>([]);
+  const [isExtractingEvidence, setIsExtractingEvidence] = useState(false);
 
   // Audio state
   const [micVolume, setMicVolume] = useState(0);
@@ -134,6 +140,13 @@ export default function InterviewRoomPage({ params }: PageProps) {
         );
         break;
 
+      case "evidence.recorded":
+        setEvidence((prev) => {
+          if (prev.some((e) => e.id === event.evidence.id)) return prev;
+          return [...prev, event.evidence];
+        });
+        break;
+
       case "session.ended":
         audioPlayer.stopAll();
         recorderRef.current?.stop();
@@ -170,6 +183,13 @@ export default function InterviewRoomPage({ params }: PageProps) {
           setTranscript(data.transcript || []);
           setIsPaused(data.status === InterviewStatus.PAUSED);
           setLoading(false);
+          // Fetch existing evidence records
+          api.interviews
+            .getEvidence(sessionId)
+            .then((evs) => {
+              if (active) setEvidence(evs);
+            })
+            .catch(() => {});
         }
       })
       .catch((err) => {
@@ -299,6 +319,25 @@ export default function InterviewRoomPage({ params }: PageProps) {
     }
   };
 
+  const handleBatchExtract = async () => {
+    if (!sessionId) return;
+    setIsExtractingEvidence(true);
+    try {
+      const records = await api.interviews.batchExtractEvidence(sessionId);
+      if (records.length > 0) {
+        setEvidence((prev) => {
+          const existingIds = new Set(prev.map((e) => e.id));
+          const newRecords = records.filter((r) => !existingIds.has(r.id));
+          return [...prev, ...newRecords];
+        });
+      }
+    } catch (err) {
+      console.error("Batch evidence extraction failed:", err);
+    } finally {
+      setIsExtractingEvidence(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-zinc-400">
@@ -418,6 +457,12 @@ export default function InterviewRoomPage({ params }: PageProps) {
             onInterrupt={handleInterrupt}
             onTogglePause={handleTogglePause}
             onSendText={handleSendText}
+          />
+
+          <InterviewEvidencePanel
+            evidence={evidence}
+            onBatchExtract={handleBatchExtract}
+            isExtracting={isExtractingEvidence}
           />
         </div>
       </main>

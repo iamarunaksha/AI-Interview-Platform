@@ -10,6 +10,7 @@ import { InterviewOrchestratorService } from './orchestrator/interview-orchestra
 import { AiModule } from '../ai/ai.module.js';
 import { TracksModule } from '../tracks/tracks.module.js';
 import { AuthModule } from '../auth/auth.module.js';
+import { EvidenceModule } from '../evidence/evidence.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { AuthModule } from '../auth/auth.module.js';
     AiModule,
     TracksModule,
     AuthModule,
+    EvidenceModule,
   ],
   providers: [
     InterviewService,

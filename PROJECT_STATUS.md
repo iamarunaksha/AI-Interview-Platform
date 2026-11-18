@@ -1,7 +1,7 @@
 # Project Status: AI Interview Platform
 
 **Last Updated:** 2026-11-18  
-**Current Phase:** Phase 6: Interview Orchestrator  
+**Current Phase:** Phase 7: Evidence Collection Engine  
 **Phase Status:** COMPLETED
 
 ---
@@ -17,8 +17,8 @@
 | Phase 4  | AI Provider Abstraction Layer             | **COMPLETED**          |
 | Phase 5  | Voice Interview MVP                       | **COMPLETED**          |
 | Phase 6  | Interview Orchestrator                    | **COMPLETED**          |
-| Phase 7  | Evidence Collection Engine                | **NEXT (NOT_STARTED)** |
-| Phase 8  | Independent Evaluation Engine             | NOT_STARTED            |
+| Phase 7  | Evidence Collection Engine                | **COMPLETED**          |
+| Phase 8  | Independent Evaluation Engine             | **NEXT (NOT_STARTED)** |
 | Phase 9  | Interview Reports and Candidate Dashboard | NOT_STARTED            |
 | Phase 10 | Coding Interview Environment              | NOT_STARTED            |
 | Phase 11 | Video Interview Experience                | NOT_STARTED            |
@@ -26,6 +26,33 @@
 | Phase 13 | Testing and Quality Engineering           | NOT_STARTED            |
 | Phase 14 | Production Deployment                     | NOT_STARTED            |
 | Phase 15 | Monetization and Enterprise Readiness     | NOT_STARTED            |
+
+---
+
+## 2. Completed Milestones (Phase 7 Acceptance Criteria)
+
+- [x] Evidence Record Relational Schema (`EvidenceRecordEntity`):
+  - Created `evidence_records` table with TypeORM entity mapping UUID PK, session and competency foreign keys, and JSONB structures for technical claims, correct concepts, incorrect concepts, and missing concepts.
+  - Added enum `ReasoningQuality` (`POOR`, `FAIR`, `GOOD`, `EXCELLENT`), practical experience detection flag, and confidence score.
+- [x] AI Structured Evidence Extractor (`EvidenceExtractorService`):
+  - Structured JSON prompting targeting active LLM provider with fallback sanitization.
+  - High-fidelity deterministic heuristic fallback analyzer supporting offline testing and mock providers.
+  - Detection of real-world operational indicators (e.g. `production`, `p99`, `failover`, `latency`, `cache stampede`) to separate practical experience from textbook recitations.
+- [x] Evidence Service & Controller (`EvidenceService` & `EvidenceController`):
+  - `POST /api/interviews/:id/evidence/extract`: Extract and record single-turn evidence.
+  - `GET /api/interviews/:id/evidence`: List all evidence records for a session.
+  - `POST /api/interviews/:id/evidence/batch-extract`: Idempotently batch mine evidence across all transcript turns.
+  - `GET /api/interviews/:id/evidence/competency/:competencyId`: Filter evidence by competency.
+- [x] Asynchronous Turn Pipeline Integration:
+  - Non-blocking evidence mining on candidate answers in `InterviewService.sendClientText` and `candidate.transcript.final`.
+  - Dispatches `evidence.recorded` over WebSocket to dynamically stream extracted claims to the client in real-time.
+- [x] Frontend Live Room Evidence Inspector:
+  - Created `InterviewEvidencePanel` displaying total mined evidence, expandable claim cards, color-coded concept pills (correct, incorrect, missing), reasoning quality badges, practical experience tags, and citation drawer.
+  - Integrated into `/interview/[id]` live room layout and linked to `api.interviews.getEvidence`.
+- [x] Quality Engineering:
+  - 6 dedicated unit tests in `evidence.service.spec.ts` (46 total passing across API).
+  - All type-checks, Prettier format, Oxlint (API), ESLint (Web) passing with 0 errors and 0 warnings.
+  - Live E2E verification script (`scripts/test-phase7-e2e.mjs`) verified against live Supabase PostgreSQL and background API server.
 
 ---
 

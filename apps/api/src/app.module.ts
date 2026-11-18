@@ -9,6 +9,7 @@ import { CandidatesModule } from './candidates/candidates.module.js';
 import { TracksModule } from './tracks/tracks.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { InterviewModule } from './interview/interview.module.js';
+import { EvidenceModule } from './evidence/evidence.module.js';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { InterviewModule } from './interview/interview.module.js';
     TracksModule,
     AiModule,
     InterviewModule,
+    EvidenceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

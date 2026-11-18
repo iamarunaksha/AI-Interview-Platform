@@ -315,24 +315,48 @@ export type ConversationEvent =
       type: "orchestrator.transition";
       transition: OrchestratorTransitionEvent;
       timestamp: number;
+    }
+  | {
+      type: "evidence.recorded";
+      evidence: EvidenceRecord;
+      timestamp: number;
     };
 
 // ---- Evidence Types ----
 
+export enum ReasoningQuality {
+  POOR = "poor",
+  FAIR = "fair",
+  GOOD = "good",
+  EXCELLENT = "excellent",
+}
+
 export interface EvidenceRecord {
   id: string;
   sessionId: string;
-  competencyId: string;
+  competencyId?: string | null;
+  turnId?: string | null;
   questionAsked: string;
   candidateAnswer: string;
   technicalClaims: string[];
   correctConcepts: string[];
   incorrectConcepts: string[];
   missingConcepts: string[];
-  reasoningQuality: "poor" | "fair" | "good" | "excellent";
+  reasoningQuality: ReasoningQuality;
   practicalExperience: boolean;
   confidence: number;
   notes: string;
+  createdAt: string;
+}
+
+export interface ExtractEvidenceRequest {
+  sessionId: string;
+  questionAsked: string;
+  candidateAnswer: string;
+  competencyId?: string;
+  turnId?: string;
+  expectedConcepts?: string[];
+  commonMisconceptions?: string[];
 }
 
 // ---- Evaluation Types ----

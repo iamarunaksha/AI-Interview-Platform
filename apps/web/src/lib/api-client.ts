@@ -20,6 +20,7 @@ import {
   type InterviewSessionResponse,
   type TranscriptTurn,
   type OrchestratorState,
+  type EvidenceRecord,
 } from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -241,6 +242,36 @@ export const api = {
     ): Promise<OrchestratorState | null> => {
       return apiFetch<OrchestratorState | null>(
         `/api/interviews/${id}/orchestrator`,
+      );
+    },
+
+    getEvidence: async (id: string): Promise<EvidenceRecord[]> => {
+      return apiFetch<EvidenceRecord[]>(`/api/interviews/${id}/evidence`);
+    },
+
+    extractEvidence: async (
+      id: string,
+      dto: {
+        questionAsked: string;
+        candidateAnswer: string;
+        competencyId?: string;
+      },
+    ): Promise<EvidenceRecord> => {
+      return apiFetch<EvidenceRecord>(
+        `/api/interviews/${id}/evidence/extract`,
+        {
+          method: "POST",
+          body: JSON.stringify(dto),
+        },
+      );
+    },
+
+    batchExtractEvidence: async (id: string): Promise<EvidenceRecord[]> => {
+      return apiFetch<EvidenceRecord[]>(
+        `/api/interviews/${id}/evidence/batch-extract`,
+        {
+          method: "POST",
+        },
       );
     },
   },

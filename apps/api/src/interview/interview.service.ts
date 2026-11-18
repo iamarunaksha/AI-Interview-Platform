@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, type FindOptionsRelations } from 'typeorm';
@@ -10,6 +11,7 @@ import { InterviewSessionEntity } from './entities/interview-session.entity.js';
 import { Question } from '../tracks/entities/question.entity.js';
 import { ProviderRegistryService } from '../ai/provider-registry.service.js';
 import { InterviewOrchestratorService } from './orchestrator/interview-orchestrator.service.js';
+import { EvidenceService } from '../evidence/evidence.service.js';
 import type { IRealtimeSession } from '../ai/interfaces/realtime-provider.interface.js';
 import {
   ProfessionalDomain,
@@ -43,6 +45,8 @@ export class InterviewService {
     private readonly questionRepo: Repository<Question>,
     private readonly providerRegistry: ProviderRegistryService,
     private readonly orchestrator: InterviewOrchestratorService,
+    @Optional()
+    private readonly evidenceService?: EvidenceService,
   ) {}
 
   /**
@@ -254,6 +258,35 @@ export class InterviewService {
               timestamp: Date.now(),
             });
           });
+
+        // Trigger background evidence extraction
+        if (this.evidenceService && event.text.trim().length >= 20) {
+          void this.evidenceService
+            .extractAndSaveEvidence({
+              sessionId,
+              turnId: `turn-cnd-${Date.now()}`,
+              questionAsked:
+                session.currentQuestion?.stem || 'Interview question',
+              candidateAnswer: event.text,
+              competencyId: session.currentQuestion?.competencyId,
+              expectedConcepts: session.currentQuestion?.expectedConcepts,
+              commonMisconceptions:
+                session.currentQuestion?.commonMisconceptions,
+            })
+            .then((saved) => {
+              const resp = this.evidenceService?.mapToResponse(saved);
+              if (resp) {
+                onEvent({
+                  type: 'evidence.recorded',
+                  evidence: resp,
+                  timestamp: Date.now(),
+                });
+              }
+            })
+            .catch((err) => {
+              this.logger.warn(`Background evidence extraction failed: ${err}`);
+            });
+        }
       }
 
       onEvent(event);
@@ -280,7 +313,16 @@ export class InterviewService {
    * Forward client text (typing / chat) to the AI real-time session.
    */
   async sendClientText(sessionId: string, text: string): Promise<void> {
-    const bridge = this.activeRealtimeSessions.get(sessionId);
+    let bridge = this.activeRealtimeSessions.get(sessionId);
+    if (!bridge) {
+      // Await briefly in case bridge is currently connecting
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+        bridge = this.activeRealtimeSessions.get(sessionId);
+        if (bridge) break;
+      }
+    }
+
     if (bridge) {
       // Record candidate turn immediately
       await this.appendTranscriptTurn(sessionId, {
@@ -310,6 +352,34 @@ export class InterviewService {
           state: orchResult.state,
           timestamp: Date.now(),
         });
+      }
+
+      // Trigger background evidence extraction for text turn
+      if (this.evidenceService && text.trim().length >= 20) {
+        void this.evidenceService
+          .extractAndSaveEvidence({
+            sessionId,
+            turnId: `turn-cnd-${Date.now()}`,
+            questionAsked:
+              session.currentQuestion?.stem || 'Interview question',
+            candidateAnswer: text,
+            competencyId: session.currentQuestion?.competencyId,
+            expectedConcepts: session.currentQuestion?.expectedConcepts,
+            commonMisconceptions: session.currentQuestion?.commonMisconceptions,
+          })
+          .then((saved) => {
+            const resp = this.evidenceService?.mapToResponse(saved);
+            if (resp && callback) {
+              callback({
+                type: 'evidence.recorded',
+                evidence: resp,
+                timestamp: Date.now(),
+              });
+            }
+          })
+          .catch((err) => {
+            this.logger.warn(`Background evidence extraction failed: ${err}`);
+          });
       }
 
       await bridge.sendText(text);
