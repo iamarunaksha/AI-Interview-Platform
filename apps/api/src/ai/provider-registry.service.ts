@@ -121,6 +121,17 @@ export class ProviderRegistryService {
   }
 
   /**
+   * Get Evaluation provider by name, falling back to mock simulator if unconfigured.
+   */
+  getEvaluationProvider(name: string): IEvaluationProvider {
+    const provider = this.evaluationProviders.get(name.toLowerCase());
+    if (provider && provider.isConfigured) {
+      return provider;
+    }
+    return this.mockAdapter;
+  }
+
+  /**
    * Returns a complete status snapshot of all AI providers.
    */
   async getStatus(): Promise<AiSystemStatusResponse> {

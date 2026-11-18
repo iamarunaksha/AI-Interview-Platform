@@ -21,6 +21,7 @@ import {
   type TranscriptTurn,
   type OrchestratorState,
   type EvidenceRecord,
+  type InterviewReport,
 } from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -273,6 +274,28 @@ export const api = {
           method: "POST",
         },
       );
+    },
+
+    getEvaluation: async (id: string): Promise<InterviewReport | null> => {
+      try {
+        return await apiFetch<InterviewReport>(
+          `/api/interviews/${id}/evaluation`,
+        );
+      } catch {
+        return null;
+      }
+    },
+
+    runEvaluation: async (
+      id: string,
+      provider?: string,
+    ): Promise<InterviewReport> => {
+      const url = provider
+        ? `/api/interviews/${id}/evaluation?provider=${encodeURIComponent(provider)}`
+        : `/api/interviews/${id}/evaluation`;
+      return apiFetch<InterviewReport>(url, {
+        method: "POST",
+      });
     },
   },
 };

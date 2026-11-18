@@ -10,6 +10,7 @@ import { TracksModule } from './tracks/tracks.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { InterviewModule } from './interview/interview.module.js';
 import { EvidenceModule } from './evidence/evidence.module.js';
+import { EvaluationModule } from './evaluation/evaluation.module.js';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { EvidenceModule } from './evidence/evidence.module.js';
     AiModule,
     InterviewModule,
     EvidenceModule,
+    EvaluationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

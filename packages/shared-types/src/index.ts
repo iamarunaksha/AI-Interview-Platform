@@ -362,11 +362,13 @@ export interface ExtractEvidenceRequest {
 // ---- Evaluation Types ----
 
 export interface CompetencyScore {
+  id?: string;
   competencyId: string;
   competencyName: string;
   score: number | null;
   rating: EvaluationRating;
   justification: string;
+  evidenceRefs?: string[];
   sufficientEvidence: boolean;
 }
 
@@ -383,6 +385,8 @@ export interface InterviewReport {
   areasNotAssessed: string[];
   recommendations: string[];
   suggestedNextDifficulty: InterviewDifficulty;
+  evaluatorModel?: string;
+  evaluatorProvider?: string;
   generatedAt: string;
 }
 

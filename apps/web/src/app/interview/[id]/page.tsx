@@ -14,6 +14,7 @@ import { InterviewAudioVisualizer } from "@/components/interview/interview-audio
 import { InterviewTranscript } from "@/components/interview/interview-transcript";
 import { InterviewControls } from "@/components/interview/interview-controls";
 import { InterviewEvidencePanel } from "@/components/interview/interview-evidence-panel";
+import { InterviewEvaluationCard } from "@/components/interview/interview-evaluation-card";
 import {
   InterviewStatus,
   InterviewStage,
@@ -23,6 +24,7 @@ import {
   type ConversationEvent,
   type OrchestratorState,
   type EvidenceRecord,
+  type InterviewReport,
 } from "@interviewai/shared-types";
 
 interface PageProps {
@@ -45,6 +47,11 @@ export default function InterviewRoomPage({ params }: PageProps) {
   // Evidence Collection State
   const [evidence, setEvidence] = useState<EvidenceRecord[]>([]);
   const [isExtractingEvidence, setIsExtractingEvidence] = useState(false);
+
+  // Independent Evaluation State
+  const [evaluationReport, setEvaluationReport] =
+    useState<InterviewReport | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
 
   // Audio state
   const [micVolume, setMicVolume] = useState(0);
@@ -188,6 +195,13 @@ export default function InterviewRoomPage({ params }: PageProps) {
             .getEvidence(sessionId)
             .then((evs) => {
               if (active) setEvidence(evs);
+            })
+            .catch(() => {});
+          // Fetch existing evaluation report
+          api.interviews
+            .getEvaluation(sessionId)
+            .then((rep) => {
+              if (active && rep) setEvaluationReport(rep);
             })
             .catch(() => {});
         }
@@ -338,6 +352,19 @@ export default function InterviewRoomPage({ params }: PageProps) {
     }
   };
 
+  const handleEvaluate = async () => {
+    if (!sessionId) return;
+    setIsEvaluating(true);
+    try {
+      const rep = await api.interviews.runEvaluation(sessionId);
+      setEvaluationReport(rep);
+    } catch (err) {
+      console.error("Evaluation generation failed:", err);
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-zinc-400">
@@ -463,6 +490,16 @@ export default function InterviewRoomPage({ params }: PageProps) {
             evidence={evidence}
             onBatchExtract={handleBatchExtract}
             isExtracting={isExtractingEvidence}
+          />
+        </div>
+
+        {/* Full-Width Bottom Section: Independent Rubric Evaluation */}
+        <div className="lg:col-span-12">
+          <InterviewEvaluationCard
+            report={evaluationReport}
+            isEvaluating={isEvaluating}
+            onEvaluate={handleEvaluate}
+            isSessionConcluded={session.status === InterviewStatus.COMPLETED}
           />
         </div>
       </main>
