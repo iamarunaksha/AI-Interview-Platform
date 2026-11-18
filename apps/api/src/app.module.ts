@@ -11,6 +11,7 @@ import { AiModule } from './ai/ai.module.js';
 import { InterviewModule } from './interview/interview.module.js';
 import { EvidenceModule } from './evidence/evidence.module.js';
 import { EvaluationModule } from './evaluation/evaluation.module.js';
+import { ReportsModule } from './reports/reports.module.js';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { EvaluationModule } from './evaluation/evaluation.module.js';
     InterviewModule,
     EvidenceModule,
     EvaluationModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

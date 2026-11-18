@@ -22,6 +22,8 @@ import {
   type OrchestratorState,
   type EvidenceRecord,
   type InterviewReport,
+  type ComprehensiveInterviewReport,
+  type CandidateDashboardMetrics,
 } from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -296,6 +298,58 @@ export const api = {
       return apiFetch<InterviewReport>(url, {
         method: "POST",
       });
+    },
+
+    getReport: async (
+      id: string,
+    ): Promise<ComprehensiveInterviewReport | null> => {
+      try {
+        return await apiFetch<ComprehensiveInterviewReport>(
+          `/api/interviews/${id}/report`,
+        );
+      } catch {
+        return null;
+      }
+    },
+
+    generateReport: async (
+      id: string,
+    ): Promise<ComprehensiveInterviewReport> => {
+      return apiFetch<ComprehensiveInterviewReport>(
+        `/api/interviews/${id}/report`,
+        {
+          method: "POST",
+        },
+      );
+    },
+  },
+
+  reports: {
+    getReport: async (
+      sessionId: string,
+    ): Promise<ComprehensiveInterviewReport | null> => {
+      try {
+        return await apiFetch<ComprehensiveInterviewReport>(
+          `/api/interviews/${sessionId}/report`,
+        );
+      } catch {
+        return null;
+      }
+    },
+
+    generateReport: async (
+      sessionId: string,
+    ): Promise<ComprehensiveInterviewReport> => {
+      return apiFetch<ComprehensiveInterviewReport>(
+        `/api/interviews/${sessionId}/report`,
+        {
+          method: "POST",
+        },
+      );
+    },
+
+    getDashboardMetrics: async (): Promise<CandidateDashboardMetrics> => {
+      return apiFetch<CandidateDashboardMetrics>("/api/reports/dashboard");
     },
   },
 };

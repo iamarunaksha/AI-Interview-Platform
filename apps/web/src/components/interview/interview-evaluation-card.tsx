@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {
   type InterviewReport,
   EvaluationRating,
@@ -73,41 +74,53 @@ export function InterviewEvaluationCard({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => void onEvaluate()}
-          disabled={isEvaluating}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-indigo-500 disabled:opacity-50"
-        >
-          {isEvaluating ? (
-            <>
-              <svg
-                className="h-4 w-4 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v8H4z"
-                />
-              </svg>
-              Evaluating Rubrics...
-            </>
-          ) : report ? (
-            "Re-evaluate Session"
-          ) : (
-            "Generate Evaluation Report"
+        <div className="flex items-center gap-2">
+          {report && (
+            <Link
+              href={`/interview/${report.sessionId}/report`}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-800/80 px-3.5 py-2 text-xs font-semibold text-zinc-200 shadow-sm transition-all hover:bg-zinc-700 hover:text-white"
+            >
+              <span>📄</span>
+              <span>Full Executive Report</span>
+            </Link>
           )}
-        </button>
+
+          <button
+            type="button"
+            onClick={() => void onEvaluate()}
+            disabled={isEvaluating}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {isEvaluating ? (
+              <>
+                <svg
+                  className="h-4 w-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8H4z"
+                  />
+                </svg>
+                Evaluating Rubrics...
+              </>
+            ) : report ? (
+              "Re-evaluate Session"
+            ) : (
+              "Generate Evaluation Report"
+            )}
+          </button>
+        </div>
       </div>
 
       {!report ? (

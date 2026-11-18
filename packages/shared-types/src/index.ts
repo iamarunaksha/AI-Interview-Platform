@@ -390,6 +390,100 @@ export interface InterviewReport {
   generatedAt: string;
 }
 
+// ---- Phase 9: Report & Dashboard Types ----
+
+export enum ReportStatus {
+  GENERATED = "GENERATED",
+  ARCHIVED = "ARCHIVED",
+}
+
+export interface DetailedReportEvidence {
+  id: string;
+  competencyId?: string;
+  competencyName: string;
+  questionAsked: string;
+  candidateAnswer: string;
+  technicalClaims: string[];
+  correctConcepts: string[];
+  incorrectConcepts: string[];
+  missingConcepts: string[];
+  reasoningQuality: ReasoningQuality;
+  practicalExperience: boolean;
+  confidence: number;
+}
+
+export interface ComprehensiveInterviewReport {
+  id: string;
+  sessionId: string;
+  evaluationId: string;
+  candidateName: string;
+  candidateEmail: string;
+  domain: ProfessionalDomain;
+  targetRole: string;
+  experienceLevel: ExperienceLevel;
+  difficulty: InterviewDifficulty;
+  durationMinutes: number;
+  actualDurationSeconds: number | null;
+  sessionStatus: InterviewStatus;
+  overallScore: number | null;
+  overallRating: EvaluationRating;
+  summary: string;
+  competencyScores: CompetencyScore[];
+  detailedEvidence: DetailedReportEvidence[];
+  strengths: string[];
+  weaknesses: string[];
+  incorrectStatements: string[];
+  areasNotAssessed: string[];
+  recommendations: string[];
+  suggestedNextDifficulty: InterviewDifficulty;
+  evaluatorModel: string;
+  evaluatorProvider: string;
+  transcriptLength: number;
+  status: ReportStatus;
+  generatedAt: string;
+}
+
+export interface CompetencyPerformanceSummary {
+  competencyId: string;
+  competencyName: string;
+  category: string;
+  averageScore: number;
+  latestScore: number;
+  evaluationsCount: number;
+}
+
+export interface CandidateSessionSummary {
+  id: string;
+  domain: ProfessionalDomain;
+  targetRole: string;
+  difficulty: InterviewDifficulty;
+  status: InterviewStatus;
+  overallScore: number | null;
+  overallRating: EvaluationRating | null;
+  durationMinutes: number;
+  actualDurationSeconds: number | null;
+  hasReport: boolean;
+  createdAt: string;
+  endedAt: string | null;
+}
+
+export interface CandidateDashboardMetrics {
+  totalInterviews: number;
+  completedInterviews: number;
+  inProgressInterviews: number;
+  averageScore: number | null;
+  highestScore: number | null;
+  ratingDistribution: Record<EvaluationRating, number>;
+  competencyPerformance: CompetencyPerformanceSummary[];
+  recentSessions: CandidateSessionSummary[];
+  topStrengths: string[];
+  focusAreas: string[];
+  recommendedNextStep: {
+    suggestedDifficulty: InterviewDifficulty;
+    recommendedTopics: string[];
+  };
+}
+
 // ---- Competency & Question Bank Types ----
 
 export interface CompetencyResponse {
