@@ -1,7 +1,7 @@
 # Project Status: AI Interview Platform
 
 **Last Updated:** 2026-11-18  
-**Current Phase:** Phase 3: Interview Track and Question Bank Engine  
+**Current Phase:** Phase 4: AI Provider Abstraction Layer  
 **Phase Status:** COMPLETED  
 
 ---
@@ -14,8 +14,8 @@
 | Phase 1  | Development Environment & Project Setup   | **COMPLETED**          |
 | Phase 2  | Authentication and Candidate Onboarding   | **COMPLETED**          |
 | Phase 3  | Interview Track and Question Bank Engine  | **COMPLETED**          |
-| Phase 4  | AI Provider Abstraction Layer             | **NEXT (NOT_STARTED)** |
-| Phase 5  | Voice Interview MVP                       | NOT_STARTED            |
+| Phase 4  | AI Provider Abstraction Layer             | **COMPLETED**          |
+| Phase 5  | Voice Interview MVP                       | **NEXT (NOT_STARTED)** |
 | Phase 6  | Interview Orchestrator                    | NOT_STARTED            |
 | Phase 7  | Evidence Collection Engine                | NOT_STARTED            |
 | Phase 8  | Independent Evaluation Engine             | NOT_STARTED            |
@@ -29,34 +29,35 @@
 
 ---
 
-## 2. Completed Milestones (Phase 3 Acceptance Criteria)
+## 2. Completed Milestones (Phase 4 Acceptance Criteria)
 
-- [x] Designed & deployed `Competency` and `Question` TypeORM entities to Supabase PostgreSQL:
-  - Strongly typed relationship (`Competency 1:N Question`)
-  - Indexed slugs, domains, and difficulty tiers
-  - JSONB arrays for `expectedConcepts`, `commonMisconceptions`, `probingQuestions`, and `rubricGuide`
-- [x] Implemented rich seed pipeline (`question-bank.seed.ts`) covering:
-  - **SDE:** Distributed Rate Limiter Design, Concurrent LRU Cache Architecture, Consistent Hashing & Ring Partitioning, Relational Database Indexing & B+ Trees
-  - **SAP:** SAP TM Freight Unit Building & Transportation Cockpit, SAP ABAP Core Data Services (CDS) Views & Code Pushdown
-- [x] Built Adaptive Interview Traversal & Planning Engine (`TracksService.planInterview`):
-  - Traverses question graph based on duration (15m, 30m, 45m, 60m)
-  - Balances technical competencies without duplicate topics
-  - Matches candidate experience level and difficulty preferences
-- [x] Exposed RESTful APIs with class-validator DTOs:
-  - `GET  /api/tracks/competencies` (list competencies, filter by domain)
-  - `GET  /api/tracks/questions` (search question bank with multi-criteria filters)
-  - `GET  /api/tracks/questions/:id` (inspect specific question node with probes and rubrics)
-  - `POST /api/tracks/plan-interview` (plan interview session question trajectory)
-- [x] Canonical `@interviewai/shared-types` updated with:
-  - `CompetencyResponse`, `QuestionResponse`, `ProbingQuestion`, `RubricLevelGuide`, `InterviewPlanResponse`
-- [x] Frontend Track & Question Bank Explorer (`/tracks`):
-  - SDE and SAP domain tabs
-  - Competency matrix card displaying capabilities evaluated
-  - Interactive accordion question viewer with expected concepts, misconceptions, probing follow-ups, and 4-point rubric guides
-  - Difficulty filter (All, Easy, Medium, Hard)
-  - Navigation bar updated with Question Bank link
-- [x] Comprehensive test suite & quality gates:
-  - Vitest 13/13 tests passing (4 suites)
+- [x] Defined provider-agnostic interfaces in NestJS:
+  - `ILlmProvider` (`generateText`, `generateChat`, `streamChat`, `testConnection`)
+  - `IRealtimeVoiceProvider` (`createSession`, `sendAudio`, `sendText`, `interrupt`, `close`, `onEvent`)
+  - `IEvaluationProvider` (`evaluateSession` producing typed `InterviewReport`)
+- [x] Implemented production `GeminiLlmAdapter` using official Google Gen AI SDK (`@google/genai`):
+  - Gemini 2.0 Flash (`gemini-2.0-flash`) support
+  - Single-prompt, multi-turn chat, and token streaming
+  - Structured JSON evaluation generation
+  - Graceful fallback to `MockAiAdapter` when `GEMINI_API_KEY` is omitted
+- [x] Implemented `MockAiAdapter`:
+  - 100% offline, zero-cost, deterministic simulator for development and CI/CD
+  - Realistic follow-ups, streaming chunks, turn-completion events, and 4-point rubric evaluation
+- [x] Implemented `DeepgramAdapter`:
+  - Fallback STT (`nova-2`) and TTS (`aura`) interface integration
+- [x] Implemented `ProviderRegistryService`:
+  - Dynamic provider selection via environment variables (`LLM_PROVIDER`, `REALTIME_PROVIDER`, `EVALUATION_PROVIDER`)
+  - Capability matrix, availability checks, and status reporting
+- [x] Exposed RESTful APIs:
+  - `GET  /api/ai/providers` (returns active selections, model names, and connection states)
+  - `POST /api/ai/test-generate` (runs test generation and reports latency in ms)
+- [x] Updated `@interviewai/shared-types` with:
+  - `ChatMessage`, `LlmGenerateOptions`, `LlmGenerateResult`, `AiProviderInfo`, `AiSystemStatusResponse`, `TestGenerateRequest`, `TestGenerateResponse`
+- [x] Frontend AI Provider Inspector (`AiProviderStatusCard` on `/dashboard`):
+  - Live active provider status badges (LLM, Voice, STT, Evaluator)
+  - Interactive generation test form with real-time response and latency measurement
+- [x] Quality Gates & Verification:
+  - Vitest 20/20 tests passing (5 test suites)
   - 4/4 TypeScript type-checks passing with 0 errors
   - 3/3 Turborepo packages building cleanly
   - Prettier 100% compliant & Linters (Oxlint + ESLint) passing with 0 warnings/errors
@@ -66,9 +67,9 @@
 ## 3. Latest Verification Results
 
 - **Shared Types:** Type-check passed (Clean `tsc` compilation to `dist/`)
-- **API (NestJS):** Vitest 13/13 tests passed (`TracksService`, `AuthService`, `CandidatesService`, `AppController`)
+- **API (NestJS):** Vitest 20/20 tests passed (`AiService`, `TracksService`, `AuthService`, `CandidatesService`, `AppController`)
 - **Web (Next.js):** Build successful (`next build --webpack`, static page generation passed for 9 routes)
-- **Live Supabase DB:** Seeded 6 competencies and 6 deep question nodes with active relations
+- **Live AI Endpoints:** `/api/ai/providers` and `/api/ai/test-generate` verified with live latency benchmarking
 - **Linters:** Oxlint (API) & ESLint (Web) passed with 0 errors and 0 warnings
 - **Prettier:** 100% compliant (`pnpm format:check`)
 
@@ -76,8 +77,8 @@
 
 ## 4. Next Recommended Action
 
-**Commence Phase 4: AI Provider Abstraction Layer**
-1. Design provider-agnostic adapter interfaces (`RealtimeAudioAdapter`, `LlmAdapter`, `SttAdapter`, `TtsAdapter`).
-2. Implement Gemini Live API / Multimodal adapter (`GeminiLiveAdapter`).
-3. Implement Deepgram STT/TTS fallback adapters.
-4. Build canonical event normalizer for bidirectional streaming (`ConversationEvent`).
+**Commence Phase 5: Voice Interview MVP**
+1. Set up WebSocket Gateway (`InterviewGateway`) in NestJS using `@nestjs/websockets`.
+2. Connect WebSocket to `IRealtimeVoiceProvider` session.
+3. Build browser audio capture (`MediaRecorder` / Web Audio API PCM pipeline) and audio playback streamer.
+4. Test live bidirectional voice interview loop end-to-end.

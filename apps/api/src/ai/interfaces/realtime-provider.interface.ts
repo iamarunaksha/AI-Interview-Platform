@@ -1,0 +1,46 @@
+import type { ConversationEvent } from '@interviewai/shared-types';
+
+export interface RealtimeSessionConfig {
+  sessionId: string;
+  systemInstruction: string;
+  voiceName?: string;
+  sampleRate?: number;
+}
+
+export interface IRealtimeSession {
+  readonly sessionId: string;
+
+  /**
+   * Send binary PCM audio chunk from candidate microphone.
+   */
+  sendAudio(pcmChunk: Buffer | Uint8Array): Promise<void>;
+
+  /**
+   * Send text message (e.g. initial greeting trigger, system instruction update).
+   */
+  sendText(text: string): Promise<void>;
+
+  /**
+   * Handle candidate interruption (cut off current assistant audio output).
+   */
+  interrupt(): Promise<void>;
+
+  /**
+   * Terminate the realtime session.
+   */
+  close(): Promise<void>;
+
+  /**
+   * Register event listener for canonical ConversationEvents.
+   */
+  onEvent(handler: (event: ConversationEvent) => void): void;
+}
+
+export interface IRealtimeVoiceProvider {
+  readonly name: string;
+  readonly isConfigured: boolean;
+
+  testConnection(): Promise<boolean>;
+
+  createSession(config: RealtimeSessionConfig): Promise<IRealtimeSession>;
+}

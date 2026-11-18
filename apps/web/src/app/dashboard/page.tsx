@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/auth-context";
+import { AiProviderStatusCard } from "../../components/ai-provider-status-card";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -138,6 +139,9 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* AI Provider Status & Benchmark */}
+          <AiProviderStatusCard />
 
           {/* Past Sessions List */}
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">

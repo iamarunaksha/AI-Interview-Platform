@@ -347,3 +347,62 @@ export interface InterviewPlanResponse {
   questions: QuestionResponse[];
   estimatedQuestionsCount: number;
 }
+
+// ---- AI Provider Abstraction Contracts ----
+
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface LlmGenerateOptions {
+  temperature?: number;
+  maxTokens?: number;
+  systemInstruction?: string;
+  responseMimeType?: "text/plain" | "application/json";
+  stopSequences?: string[];
+}
+
+export interface LlmGenerateResult {
+  text: string;
+  finishReason?: string;
+  modelName: string;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+}
+
+export interface AiProviderInfo {
+  name: string;
+  role: "llm" | "realtime" | "stt" | "tts" | "evaluation";
+  isConfigured: boolean;
+  isAvailable: boolean;
+  modelName: string;
+  details?: string;
+}
+
+export interface AiSystemStatusResponse {
+  activeProviders: {
+    llm: string;
+    realtime: string;
+    stt: string;
+    tts: string;
+    evaluation: string;
+  };
+  providers: AiProviderInfo[];
+}
+
+export interface TestGenerateRequest {
+  prompt: string;
+  provider?: string;
+  systemInstruction?: string;
+}
+
+export interface TestGenerateResponse {
+  provider: string;
+  model: string;
+  output: string;
+  latencyMs: number;
+}

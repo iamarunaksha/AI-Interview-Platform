@@ -13,6 +13,9 @@ import {
   type CompanyCategory,
   type ExperienceLevel,
   type InterviewDifficulty,
+  type AiSystemStatusResponse,
+  type TestGenerateRequest,
+  type TestGenerateResponse,
 } from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -175,6 +178,20 @@ export const api = {
       durationMinutes?: number;
     }): Promise<InterviewPlanResponse> => {
       return apiFetch<InterviewPlanResponse>("/api/tracks/plan-interview", {
+        method: "POST",
+        body: JSON.stringify(dto),
+      });
+    },
+  },
+
+  ai: {
+    getStatus: async (): Promise<AiSystemStatusResponse> => {
+      return apiFetch<AiSystemStatusResponse>("/api/ai/providers");
+    },
+    testGenerate: async (
+      dto: TestGenerateRequest,
+    ): Promise<TestGenerateResponse> => {
+      return apiFetch<TestGenerateResponse>("/api/ai/test-generate", {
         method: "POST",
         body: JSON.stringify(dto),
       });
