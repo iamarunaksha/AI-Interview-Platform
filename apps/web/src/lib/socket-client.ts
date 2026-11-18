@@ -3,6 +3,7 @@ import { getStoredAccessToken } from "./api-client";
 import type {
   ConversationEvent,
   CodeExecutionResult,
+  VideoLayoutMode,
 } from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -116,6 +117,15 @@ export class InterviewSocketClient {
       code,
       language,
       problemId,
+    });
+  }
+
+  sendVideoToggle(isCameraActive: boolean, layoutMode?: VideoLayoutMode): void {
+    if (!this.socket || !this.isConnected || !this.sessionId) return;
+    this.socket.emit("video.toggle", {
+      sessionId: this.sessionId,
+      isCameraActive,
+      layoutMode,
     });
   }
 

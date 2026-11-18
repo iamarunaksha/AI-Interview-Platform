@@ -16,10 +16,13 @@ import { InterviewControls } from "@/components/interview/interview-controls";
 import { InterviewEvidencePanel } from "@/components/interview/interview-evidence-panel";
 import { InterviewEvaluationCard } from "@/components/interview/interview-evaluation-card";
 import { InterviewCodeEditor } from "@/components/interview/interview-code-editor";
+import { InterviewVideoContainer } from "@/components/interview/interview-video-container";
+import { InterviewVideoFeed } from "@/components/interview/interview-video-feed";
 import {
   InterviewStatus,
   InterviewStage,
   MessageRole,
+  VideoLayoutMode,
   type InterviewSessionResponse,
   type TranscriptTurn,
   type ConversationEvent,
@@ -56,9 +59,13 @@ export default function InterviewRoomPage({ params }: PageProps) {
     useState<InterviewReport | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
 
-  // Coding environment state
-  const [viewMode, setViewMode] = useState<"voice" | "coding" | "split">(
-    "voice",
+  // View mode and video state
+  const [viewMode, setViewMode] = useState<
+    "voice" | "video" | "coding" | "split"
+  >("voice");
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [videoLayoutMode, setVideoLayoutMode] = useState<VideoLayoutMode>(
+    VideoLayoutMode.GRID,
   );
   const [codeExecutionResult, setCodeExecutionResult] =
     useState<CodeExecutionResult | null>(null);
@@ -179,6 +186,15 @@ export default function InterviewRoomPage({ params }: PageProps) {
           if (prev.some((e) => e.id === event.evidence.id)) return prev;
           return [...prev, event.evidence];
         });
+        break;
+
+      case "video.state":
+        if (event.isCameraActive !== undefined) {
+          setIsCameraActive(event.isCameraActive);
+        }
+        if (event.layoutMode) {
+          setVideoLayoutMode(event.layoutMode);
+        }
         break;
 
       case "session.ended":
@@ -371,6 +387,17 @@ export default function InterviewRoomPage({ params }: PageProps) {
     interviewSocket.runCode(code, language, problemId);
   };
 
+  const handleToggleCamera = () => {
+    const nextState = !isCameraActive;
+    setIsCameraActive(nextState);
+    interviewSocket.sendVideoToggle(nextState, videoLayoutMode);
+  };
+
+  const handleChangeVideoLayout = (mode: VideoLayoutMode) => {
+    setVideoLayoutMode(mode);
+    interviewSocket.sendVideoToggle(isCameraActive, mode);
+  };
+
   const handleEndInterview = async () => {
     if (!sessionId) return;
     const confirm = window.confirm(
@@ -476,7 +503,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
         />
       </div>
 
-      {/* Mode Switcher: Voice vs Coding vs Split */}
+      {/* Mode Switcher: Voice vs Video vs Coding vs Split */}
       <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 pt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
           <button
@@ -489,7 +516,19 @@ export default function InterviewRoomPage({ params }: PageProps) {
             }`}
           >
             <span>🎙️</span>
-            <span>Voice & Discussion</span>
+            <span>Voice</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("video")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              viewMode === "video"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <span>📹</span>
+            <span>Video Room</span>
           </button>
           <button
             type="button"
@@ -501,7 +540,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
             }`}
           >
             <span>💻</span>
-            <span>Live Code Editor</span>
+            <span>Code Editor</span>
           </button>
           <button
             type="button"
@@ -517,19 +556,37 @@ export default function InterviewRoomPage({ params }: PageProps) {
           </button>
         </div>
 
-        {/* Live Audio State Pill */}
-        <div className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900/60 px-3 py-1.5 rounded-xl border border-zinc-800/80">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isMicActive ? "bg-emerald-400 animate-pulse" : "bg-zinc-600"
+        {/* Live Controls: Camera Toggle & Audio State Pill */}
+        <div className="flex items-center gap-2">
+          {/* Quick Camera Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleCamera}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
+              isCameraActive
+                ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/60"
+                : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
             }`}
-          />
-          <span>{isMicActive ? "Live Audio Active" : "Microphone Muted"}</span>
-          {isAssistantSpeaking && (
-            <span className="text-indigo-400 text-[11px] font-medium flex items-center gap-1">
-              <span className="animate-spin">🌀</span> AI Speaking
-            </span>
-          )}
+            title={isCameraActive ? "Turn off camera" : "Turn on camera"}
+          >
+            <span>{isCameraActive ? "📹" : "🚫"}</span>
+            <span>{isCameraActive ? "Camera On" : "Camera Off"}</span>
+          </button>
+
+          {/* Live Audio State Pill */}
+          <div className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900/60 px-3 py-1.5 rounded-xl border border-zinc-800/80">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isMicActive ? "bg-emerald-400 animate-pulse" : "bg-zinc-600"
+              }`}
+            />
+            <span>{isMicActive ? "Audio Live" : "Mic Muted"}</span>
+            {isAssistantSpeaking && (
+              <span className="text-indigo-400 text-[11px] font-medium flex items-center gap-1">
+                <span className="animate-spin">🌀</span> AI Speaking
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -613,6 +670,80 @@ export default function InterviewRoomPage({ params }: PageProps) {
           </div>
         )}
 
+        {/* VIEW MODE: VIDEO INTERVIEW ROOM */}
+        {viewMode === "video" && (
+          <div className="space-y-6">
+            <InterviewVideoContainer
+              isAssistantSpeaking={isAssistantSpeaking}
+              stage={
+                orchestratorState?.stage ??
+                session.currentStage ??
+                InterviewStage.GREETING
+              }
+              personality={session.personality}
+              companyCategory={session.companyCategory}
+              targetRole={session.targetRole}
+              candidateName="Candidate"
+              isCameraActive={isCameraActive}
+              onToggleCamera={handleToggleCamera}
+              layoutMode={videoLayoutMode}
+              onChangeLayoutMode={handleChangeVideoLayout}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-5 space-y-6 flex flex-col">
+                <InterviewQuestionCard
+                  question={session.currentQuestion ?? null}
+                />
+                <InterviewConceptTracker
+                  coveredConcepts={
+                    orchestratorState?.coveredConcepts ??
+                    session.coveredConcepts ??
+                    []
+                  }
+                  remainingConcepts={
+                    orchestratorState?.remainingConcepts ??
+                    session.currentQuestion?.expectedConcepts ??
+                    []
+                  }
+                  activeProbingQuestion={
+                    orchestratorState?.activeProbingQuestion ?? null
+                  }
+                />
+                <InterviewAudioVisualizer
+                  micVolume={micVolume}
+                  isAssistantSpeaking={isAssistantSpeaking}
+                  isMicActive={isMicActive}
+                />
+              </div>
+
+              <div className="lg:col-span-7 flex flex-col gap-4">
+                <InterviewTranscript
+                  transcript={transcript}
+                  streamingDelta={streamingDelta}
+                  streamingRole={streamingRole}
+                />
+                <InterviewControls
+                  isMicActive={isMicActive}
+                  isSpeakerMuted={isSpeakerMuted}
+                  isAssistantSpeaking={isAssistantSpeaking}
+                  isPaused={isPaused}
+                  onToggleMic={handleToggleMic}
+                  onToggleSpeaker={handleToggleSpeaker}
+                  onInterrupt={handleInterrupt}
+                  onTogglePause={handleTogglePause}
+                  onSendText={handleSendText}
+                />
+                <InterviewEvidencePanel
+                  evidence={evidence}
+                  onBatchExtract={handleBatchExtract}
+                  isExtracting={isExtractingEvidence}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* VIEW MODE: CODING ENVIRONMENT */}
         {viewMode === "coding" && (
           <div className="space-y-4">
@@ -670,6 +801,18 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
             {/* Right Column: Audio & Transcript (5 cols) */}
             <div className="lg:col-span-5 flex flex-col gap-4">
+              {isCameraActive && (
+                <div className="h-44 rounded-2xl overflow-hidden border border-zinc-800">
+                  <InterviewVideoFeed
+                    isCameraActive={isCameraActive}
+                    onToggleCamera={handleToggleCamera}
+                    layoutMode={videoLayoutMode}
+                    candidateName="Candidate"
+                    isCompact={true}
+                  />
+                </div>
+              )}
+
               <InterviewAudioVisualizer
                 micVolume={micVolume}
                 isAssistantSpeaking={isAssistantSpeaking}

@@ -1,10 +1,10 @@
 # Project Status: AI Interview Platform
 
 **Last Updated:** 2026-11-19  
-**Current Phase:** Phase 10: Coding Interview Environment  
+**Current Phase:** Phase 11: Video Interview Experience  
 **Phase Status:** COMPLETED  
-**Next Phase:** Phase 11: Video Interview Experience  
-**Milestone:** Coding Environment with Monaco Editor & Sandboxed Test Suite Runner Complete!
+**Next Phase:** Phase 12: SAP Interview Specialization  
+**Milestone:** Video Interview Experience with WebRTC Media Streams & AI Avatar Complete!
 
 ---
 
@@ -23,15 +23,49 @@
 | Phase 8  | Independent Evaluation Engine             | **COMPLETED**          |
 | Phase 9  | Interview Reports and Candidate Dashboard | **COMPLETED**          |
 | Phase 10 | Coding Interview Environment              | **COMPLETED**          |
-| Phase 11 | Video Interview Experience                | **NEXT (NOT_STARTED)** |
-| Phase 12 | SAP Interview Specialization              | NOT_STARTED            |
+| Phase 11 | Video Interview Experience                | **COMPLETED**          |
+| Phase 12 | SAP Interview Specialization              | **NEXT (NOT_STARTED)** |
 | Phase 13 | Testing and Quality Engineering           | NOT_STARTED            |
 | Phase 14 | Production Deployment                     | NOT_STARTED            |
 | Phase 15 | Monetization and Enterprise Readiness     | NOT_STARTED            |
 
 ---
 
-## 2. Completed Milestones (Phase 10 Acceptance Criteria)
+## 2. Completed Milestones (Phase 11 Acceptance Criteria)
+
+- [x] Candidate Video Stream Pipeline (`VideoStreamPipeline`):
+  - Hardware camera acquisition using `navigator.mediaDevices.getUserMedia` with configurable resolutions up to 720p HD.
+  - Multi-camera device enumeration and dynamic camera switching via `switchDevice(deviceId)`.
+  - Privacy-preserving video metrics: local frame resolution, estimated frame rate, and real-time canvas brightness estimation ("optimal", "low light", "high exposure") without biometric or facial emotion scoring (Section 10 compliant).
+  - Track-level muting and hardware lock release on component unmount.
+- [x] AI Technical Interviewer Avatar (`InterviewAiAvatar`):
+  - Visual tech-lead persona card featuring audio-reactive soundwave rings and waveform pulses responding to `isAssistantSpeaking`.
+  - Dynamic company category calibration (FAANG Bar Raiser, Startup Tech Lead, Enterprise Solutions Architect).
+  - Real-time status indicators ("Speaking...", "Listening actively...", "Framing technical problem", "Stress testing edge cases").
+- [x] Candidate Video Feed Component (`InterviewVideoFeed`):
+  - Native video viewport with mirror flip toggle (`scaleX(-1)`), device selector dropdown, and camera on/off controls.
+  - Stream quality and lighting indicators.
+  - Audio-only fallback silhouette when camera is muted.
+- [x] Multi-Layout Video Container (`InterviewVideoContainer`):
+  - `GRID`: Balanced side-by-side view of AI Interviewer and Candidate.
+  - `PIP`: AI Interviewer as primary view with draggable/dockable floating candidate video in the bottom-right corner.
+  - `SPEAKER`: Active speaker focus emphasizing whoever is currently speaking (AI or candidate).
+  - Explicit Privacy & Consent notification compliant with architectural blueprint Section 10.
+- [x] Video Signaling & State Synchronization (`InterviewGateway` & `InterviewService`):
+  - WebSocket event `@SubscribeMessage('video.toggle')` syncing camera state (`isCameraActive`, `layoutMode`) and broadcasting `video.state` to all connected clients.
+  - Added `sendVideoToggle` in `socket-client.ts`.
+- [x] Integrated Multi-Mode Interview Experience (`/interview/[id]`):
+  - View switcher supporting 4 modes: "🎙️ Voice", "📹 Video Room", "💻 Code Editor", and "⚡ Split View".
+  - Quick-action Camera toggle button on the interview room toolbar.
+  - Seamless background voice streaming, transcript recording, and code execution across all views.
+- [x] Quality Engineering & Live Verification:
+  - 57 passing unit tests in `apps/api`.
+  - 0 errors / 0 warnings on Oxlint, ESLint (`apps/web`), Prettier, TypeScript (`tsc`), and Turborepo build (12/12 static/dynamic routes).
+  - Live E2E script (`scripts/test-phase11-e2e.mjs`) verifying video signaling, camera toggling, and layout mode transitions over WebSocket against Supabase.
+
+---
+
+## 3. Completed Milestones (Phase 10 Acceptance Criteria)
 
 - [x] Sandboxed Code Execution Engine (`CodingSandboxService`):
   - Isolated JavaScript/TypeScript execution powered by `node:vm` with frozen sandbox primitives (`Math`, `Array`, `Object`, `String`, `Number`, `JSON`, `RegExp`, `BigInt`, `Map`, `Set`), blocked host globals (`process`, `require`, `fetch`, `WebSocket`, `globalThis`), memory cap, and strict 2500ms timeout protection against infinite loops.

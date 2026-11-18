@@ -14,6 +14,7 @@ import { InterviewService } from './interview.service.js';
 import type {
   ConversationEvent,
   ProgrammingLanguage,
+  VideoLayoutMode,
 } from '@interviewai/shared-types';
 
 @WebSocketGateway({
@@ -267,5 +268,37 @@ export class InterviewGateway
         timestamp: Date.now(),
       });
     }
+  }
+
+  /**
+   * Handle candidate video camera toggle and layout adjustments.
+   */
+  @SubscribeMessage('video.toggle')
+  handleVideoToggle(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      sessionId?: string;
+      isCameraActive: boolean;
+      layoutMode?: VideoLayoutMode;
+    },
+  ) {
+    const sessionId = data?.sessionId || this.socketSessionMap.get(client.id);
+    if (!sessionId) return;
+
+    this.interviewService.updateSessionVideoState(
+      sessionId,
+      data.isCameraActive,
+      data.layoutMode,
+    );
+
+    const event: ConversationEvent = {
+      type: 'video.state',
+      isCameraActive: data.isCameraActive,
+      layoutMode: data.layoutMode,
+      timestamp: Date.now(),
+    };
+    client.emit('video.state', event);
+    client.emit('conversation.event', event);
   }
 }

@@ -28,6 +28,7 @@ import {
   type InterviewSessionResponse,
   type ProgrammingLanguage,
   type CodeExecutionResult,
+  type VideoLayoutMode,
 } from '@interviewai/shared-types';
 import type { CreateInterviewSessionDto } from './dto/create-interview.dto.js';
 import { CodingService } from '../coding/coding.service.js';
@@ -43,6 +44,10 @@ export class InterviewService {
   private readonly sessionCodeMap = new Map<
     string,
     { code: string; language: string }
+  >();
+  private readonly sessionVideoMap = new Map<
+    string,
+    { isCameraActive: boolean; layoutMode?: VideoLayoutMode }
   >();
 
   constructor(
@@ -529,5 +534,28 @@ export class InterviewService {
     }
 
     return result;
+  }
+
+  /**
+   * Update active video stream state for a session.
+   */
+  updateSessionVideoState(
+    sessionId: string,
+    isCameraActive: boolean,
+    layoutMode?: VideoLayoutMode,
+  ): void {
+    this.sessionVideoMap.set(sessionId, { isCameraActive, layoutMode });
+    this.logger.log(
+      `Session ${sessionId} video state updated: camera=${isCameraActive}, layout=${layoutMode || 'default'}`,
+    );
+  }
+
+  /**
+   * Retrieve active video stream state for a session.
+   */
+  getSessionVideoState(
+    sessionId: string,
+  ): { isCameraActive: boolean; layoutMode?: VideoLayoutMode } | undefined {
+    return this.sessionVideoMap.get(sessionId);
   }
 }

@@ -320,6 +320,12 @@ export type ConversationEvent =
       type: "evidence.recorded";
       evidence: EvidenceRecord;
       timestamp: number;
+    }
+  | {
+      type: "video.state";
+      isCameraActive: boolean;
+      layoutMode?: VideoLayoutMode;
+      timestamp: number;
     };
 
 // ---- Evidence Types ----
@@ -675,4 +681,34 @@ export interface CodingProblem {
   starterCode: Partial<Record<ProgrammingLanguage, string>>;
   testCases: TestCase[];
   entryFunction: string;
+}
+
+// ---- Video Interview Types (Phase 11) ----
+
+export enum VideoLayoutMode {
+  GRID = "grid",
+  PIP = "pip",
+  SPEAKER = "speaker",
+  SIDEBAR = "sidebar",
+}
+
+export interface CameraDevice {
+  deviceId: string;
+  label: string;
+}
+
+export interface VideoQualityMetrics {
+  width: number;
+  height: number;
+  frameRate: number;
+  brightnessLevel: "optimal" | "low" | "high";
+  isStreamActive: boolean;
+}
+
+export interface VideoSessionState {
+  isCameraActive: boolean;
+  isMirrored: boolean;
+  selectedDeviceId?: string;
+  layoutMode: VideoLayoutMode;
+  consentGranted: boolean;
 }
