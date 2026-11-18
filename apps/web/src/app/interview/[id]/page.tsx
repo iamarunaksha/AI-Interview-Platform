@@ -7,16 +7,20 @@ import { interviewSocket } from "@/lib/socket-client";
 import { AudioRecorderPipeline } from "@/lib/audio-recorder";
 import { audioPlayer } from "@/lib/audio-player";
 import { InterviewHeader } from "@/components/interview/interview-header";
+import { InterviewStageProgress } from "@/components/interview/interview-stage-progress";
+import { InterviewConceptTracker } from "@/components/interview/interview-concept-tracker";
 import { InterviewQuestionCard } from "@/components/interview/interview-question-card";
 import { InterviewAudioVisualizer } from "@/components/interview/interview-audio-visualizer";
 import { InterviewTranscript } from "@/components/interview/interview-transcript";
 import { InterviewControls } from "@/components/interview/interview-controls";
 import {
   InterviewStatus,
+  InterviewStage,
   MessageRole,
   type InterviewSessionResponse,
   type TranscriptTurn,
   type ConversationEvent,
+  type OrchestratorState,
 } from "@interviewai/shared-types";
 
 interface PageProps {
@@ -26,6 +30,8 @@ interface PageProps {
 export default function InterviewRoomPage({ params }: PageProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [session, setSession] = useState<InterviewSessionResponse | null>(null);
+  const [orchestratorState, setOrchestratorState] =
+    useState<OrchestratorState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,6 +115,23 @@ export default function InterviewRoomPage({ params }: PageProps) {
       case "interview.status":
         setIsPaused(event.status === InterviewStatus.PAUSED);
         setSession((prev) => (prev ? { ...prev, status: event.status } : null));
+        break;
+
+      case "orchestrator.state":
+        setOrchestratorState(event.state);
+        break;
+
+      case "orchestrator.transition":
+        setOrchestratorState((prev) =>
+          prev
+            ? {
+                ...prev,
+                stage: event.transition.toStage,
+                stageTurnCount: 0,
+                stageStartedAt: event.transition.timestamp,
+              }
+            : null,
+        );
         break;
 
       case "session.ended":
@@ -319,10 +342,38 @@ export default function InterviewRoomPage({ params }: PageProps) {
         onEndInterview={handleEndInterview}
       />
 
+      {/* Stage Progression Stepper */}
+      <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 pt-6">
+        <InterviewStageProgress
+          currentStage={
+            orchestratorState?.stage ??
+            session.currentStage ??
+            InterviewStage.GREETING
+          }
+          stageTurnCount={orchestratorState?.stageTurnCount ?? 0}
+        />
+      </div>
+
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Question stem & Audio Visualizer (5 cols) */}
         <div className="lg:col-span-5 space-y-6 flex flex-col">
           <InterviewQuestionCard question={session.currentQuestion ?? null} />
+
+          <InterviewConceptTracker
+            coveredConcepts={
+              orchestratorState?.coveredConcepts ??
+              session.coveredConcepts ??
+              []
+            }
+            remainingConcepts={
+              orchestratorState?.remainingConcepts ??
+              session.currentQuestion?.expectedConcepts ??
+              []
+            }
+            activeProbingQuestion={
+              orchestratorState?.activeProbingQuestion ?? null
+            }
+          />
 
           <InterviewAudioVisualizer
             micVolume={micVolume}

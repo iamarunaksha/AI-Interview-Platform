@@ -19,6 +19,7 @@ import {
   type CreateInterviewSessionRequest,
   type InterviewSessionResponse,
   type TranscriptTurn,
+  type OrchestratorState,
 } from "@interviewai/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -233,6 +234,14 @@ export const api = {
 
     getTranscript: async (id: string): Promise<TranscriptTurn[]> => {
       return apiFetch<TranscriptTurn[]>(`/api/interviews/${id}/transcript`);
+    },
+
+    getOrchestratorState: async (
+      id: string,
+    ): Promise<OrchestratorState | null> => {
+      return apiFetch<OrchestratorState | null>(
+        `/api/interviews/${id}/orchestrator`,
+      );
     },
   },
 };

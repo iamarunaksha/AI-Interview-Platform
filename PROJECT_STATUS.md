@@ -1,7 +1,7 @@
 # Project Status: AI Interview Platform
 
 **Last Updated:** 2026-11-18  
-**Current Phase:** Phase 5: Voice Interview MVP  
+**Current Phase:** Phase 6: Interview Orchestrator  
 **Phase Status:** COMPLETED
 
 ---
@@ -16,8 +16,8 @@
 | Phase 3  | Interview Track and Question Bank Engine  | **COMPLETED**          |
 | Phase 4  | AI Provider Abstraction Layer             | **COMPLETED**          |
 | Phase 5  | Voice Interview MVP                       | **COMPLETED**          |
-| Phase 6  | Interview Orchestrator                    | **NEXT (NOT_STARTED)** |
-| Phase 7  | Evidence Collection Engine                | NOT_STARTED            |
+| Phase 6  | Interview Orchestrator                    | **COMPLETED**          |
+| Phase 7  | Evidence Collection Engine                | **NEXT (NOT_STARTED)** |
 | Phase 8  | Independent Evaluation Engine             | NOT_STARTED            |
 | Phase 9  | Interview Reports and Candidate Dashboard | NOT_STARTED            |
 | Phase 10 | Coding Interview Environment              | NOT_STARTED            |
@@ -26,6 +26,33 @@
 | Phase 13 | Testing and Quality Engineering           | NOT_STARTED            |
 | Phase 14 | Production Deployment                     | NOT_STARTED            |
 | Phase 15 | Monetization and Enterprise Readiness     | NOT_STARTED            |
+
+---
+
+## 2. Completed Milestones (Phase 6 Acceptance Criteria)
+
+- [x] Deterministic Finite State Machine (`InterviewStageMachine`):
+  - Strictly enforces directional transitions: `GREETING` -> `PROBLEM_FRAMING` -> `PROBING` -> `DEEP_DIVE` -> `WRAP_UP` -> `CONCLUDED`.
+  - Enforces minimum turn thresholds per stage, concept coverage threshold triggers, and automatic hard-cutoff time budget reallocation (at 88%+ time elapsed, forces wrap-up).
+- [x] Context Injection Engine (`ContextInjectorService`):
+  - Stage-specific prompt generation injecting domain role standards, interviewer personality styles (`PROFESSIONAL`, `CHALLENGING`, `SUPPORTIVE`), and interview mode behavior policies (`PRACTICE`, `ASSESSMENT`, `LEARNING`).
+  - Dynamically synthesizes remaining question concepts, active probing targets, and candidate misconceptions into runtime LLM instructions.
+- [x] Technical Concept Ledger & Fuzzy Extraction (`InterviewOrchestratorService`):
+  - In-memory & DB-persisted tracking of covered concepts vs remaining concepts.
+  - Multi-word fuzzy extraction detecting key phrases and terminology from candidate speech/transcript turns.
+  - Dynamic probing question selection from question bank rubric branches based on missing concepts and candidate answers.
+- [x] WebSocket Protocol Integration (`InterviewGateway` & `InterviewService`):
+  - Emits `orchestrator.state` and `orchestrator.transition` events upon state machine progression.
+  - Exposes `GET /api/interviews/:id/orchestrator` REST endpoint for instant polling or state hydration.
+- [x] Frontend Live Room Orchestration UI:
+  - `InterviewStageProgress`: Visual multi-step progress bar showing active stage, turn count, and state status.
+  - `InterviewConceptTracker`: Real-time concept coverage percentage bar, pill badges for covered vs pending concepts, and active probing target card.
+- [x] Quality Gates & Testing:
+  - 10 unit tests for FSM, Context Injector, and Orchestrator Service (`interview-orchestrator.service.spec.ts`).
+  - Total 40 API tests passing cleanly.
+  - E2E WebSocket script (`scripts/test-phase6-e2e.mjs`) verified against live Supabase PostgreSQL and background API server.
+  - Oxlint (API) and ESLint (Web) passed with 0 errors and 0 warnings.
+  - Turbo monorepo build succeeded across all packages.
 
 ---
 

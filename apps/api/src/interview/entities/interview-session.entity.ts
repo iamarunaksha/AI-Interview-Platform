@@ -14,6 +14,7 @@ import {
   ExperienceLevel,
   InterviewDifficulty,
   InterviewStatus,
+  InterviewStage,
   InterviewMode,
   InterviewerPersonality,
   type TranscriptTurn,
@@ -96,6 +97,19 @@ export class InterviewSessionEntity {
     default: InterviewStatus.CREATED,
   })
   status: InterviewStatus;
+
+  @Column({
+    type: 'varchar',
+    length: 50,
+    default: InterviewStage.GREETING,
+  })
+  currentStage: InterviewStage;
+
+  @Column({
+    type: 'jsonb',
+    default: [],
+  })
+  coveredConcepts: string[];
 
   @Column({ type: 'uuid', nullable: true })
   currentQuestionId: string | null;

@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InterviewService } from './interview.service.js';
 import { InterviewSessionEntity } from './entities/interview-session.entity.js';
 import { Question } from '../tracks/entities/question.entity.js';
+import { InterviewOrchestratorService } from './orchestrator/interview-orchestrator.service.js';
+import { ContextInjectorService } from './orchestrator/context-injector.service.js';
 import type { ProviderRegistryService } from '../ai/provider-registry.service.js';
 import type {
   IRealtimeVoiceProvider,
@@ -14,6 +16,7 @@ import {
   ExperienceLevel,
   InterviewDifficulty,
   InterviewStatus,
+  InterviewStage,
   InterviewMode,
   InterviewerPersonality,
   MessageRole,
@@ -25,6 +28,7 @@ describe('InterviewService', () => {
   let sessionRepo: Partial<Repository<InterviewSessionEntity>>;
   let questionRepo: Partial<Repository<Question>>;
   let providerRegistry: Partial<ProviderRegistryService>;
+  let orchestratorService: InterviewOrchestratorService;
   let mockRealtimeSession: Partial<IRealtimeSession>;
   let mockRealtimeProvider: Partial<IRealtimeVoiceProvider>;
 
@@ -72,6 +76,8 @@ describe('InterviewService', () => {
     personality: InterviewerPersonality.PROFESSIONAL,
     mode: InterviewMode.PRACTICE,
     status: InterviewStatus.CREATED,
+    currentStage: InterviewStage.GREETING,
+    coveredConcepts: [],
     currentQuestionId: 'question-1',
     currentQuestion: mockQuestion,
     transcript: [],
@@ -152,10 +158,17 @@ describe('InterviewService', () => {
         .mockReturnValue(mockRealtimeProvider as IRealtimeVoiceProvider),
     };
 
+    const contextInjector = new ContextInjectorService();
+    orchestratorService = new InterviewOrchestratorService(
+      sessionRepo as Repository<InterviewSessionEntity>,
+      contextInjector,
+    );
+
     service = new InterviewService(
       sessionRepo as Repository<InterviewSessionEntity>,
       questionRepo as Repository<Question>,
       providerRegistry as ProviderRegistryService,
+      orchestratorService,
     );
   });
 

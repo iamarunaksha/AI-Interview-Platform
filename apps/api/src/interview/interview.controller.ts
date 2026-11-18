@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type {
   InterviewSessionResponse,
   TranscriptTurn,
+  OrchestratorState,
   UserProfile,
 } from '@interviewai/shared-types';
 
@@ -67,6 +68,17 @@ export class InterviewController {
   @Post(':id/end')
   async endSession(@Param('id') id: string): Promise<InterviewSessionResponse> {
     return this.interviewService.endSession(id);
+  }
+
+  /**
+   * Get the current orchestrator state for an interview session.
+   */
+  @Get(':id/orchestrator')
+  async getOrchestratorState(
+    @Param('id') id: string,
+  ): Promise<OrchestratorState | null> {
+    const session = await this.interviewService.getSession(id);
+    return this.interviewService.getOrchestratorState(session.id);
   }
 
   /**

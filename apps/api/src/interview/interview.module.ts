@@ -5,6 +5,8 @@ import { Question } from '../tracks/entities/question.entity.js';
 import { InterviewService } from './interview.service.js';
 import { InterviewGateway } from './interview.gateway.js';
 import { InterviewController } from './interview.controller.js';
+import { ContextInjectorService } from './orchestrator/context-injector.service.js';
+import { InterviewOrchestratorService } from './orchestrator/interview-orchestrator.service.js';
 import { AiModule } from '../ai/ai.module.js';
 import { TracksModule } from '../tracks/tracks.module.js';
 import { AuthModule } from '../auth/auth.module.js';
@@ -16,8 +18,18 @@ import { AuthModule } from '../auth/auth.module.js';
     TracksModule,
     AuthModule,
   ],
-  providers: [InterviewService, InterviewGateway],
+  providers: [
+    InterviewService,
+    InterviewGateway,
+    ContextInjectorService,
+    InterviewOrchestratorService,
+  ],
   controllers: [InterviewController],
-  exports: [InterviewService, InterviewGateway],
+  exports: [
+    InterviewService,
+    InterviewGateway,
+    ContextInjectorService,
+    InterviewOrchestratorService,
+  ],
 })
 export class InterviewModule {}

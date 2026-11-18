@@ -25,6 +25,10 @@ describe('InterviewGateway', () => {
         .fn()
         .mockImplementation((_sessionId, onEvent) => {
           onEvent({
+            type: 'session.ready',
+            timestamp: Date.now(),
+          });
+          onEvent({
             type: 'assistant.transcript.delta',
             text: 'Hello candidate!',
             timestamp: Date.now(),

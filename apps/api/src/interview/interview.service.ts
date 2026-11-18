@@ -9,6 +9,7 @@ import { Repository, type FindOptionsRelations } from 'typeorm';
 import { InterviewSessionEntity } from './entities/interview-session.entity.js';
 import { Question } from '../tracks/entities/question.entity.js';
 import { ProviderRegistryService } from '../ai/provider-registry.service.js';
+import { InterviewOrchestratorService } from './orchestrator/interview-orchestrator.service.js';
 import type { IRealtimeSession } from '../ai/interfaces/realtime-provider.interface.js';
 import {
   ProfessionalDomain,
@@ -16,6 +17,7 @@ import {
   ExperienceLevel,
   InterviewDifficulty,
   InterviewStatus,
+  InterviewStage,
   InterviewMode,
   InterviewerPersonality,
   MessageRole,
@@ -29,6 +31,10 @@ import type { CreateInterviewSessionDto } from './dto/create-interview.dto.js';
 export class InterviewService {
   private readonly logger = new Logger(InterviewService.name);
   private readonly activeRealtimeSessions = new Map<string, IRealtimeSession>();
+  private readonly sessionEventCallbacks = new Map<
+    string,
+    (event: ConversationEvent) => void
+  >();
 
   constructor(
     @InjectRepository(InterviewSessionEntity)
@@ -36,6 +42,7 @@ export class InterviewService {
     @InjectRepository(Question)
     private readonly questionRepo: Repository<Question>,
     private readonly providerRegistry: ProviderRegistryService,
+    private readonly orchestrator: InterviewOrchestratorService,
   ) {}
 
   /**
@@ -78,6 +85,8 @@ export class InterviewService {
       personality: dto.personality ?? InterviewerPersonality.PROFESSIONAL,
       mode: dto.mode ?? InterviewMode.PRACTICE,
       status: InterviewStatus.CREATED,
+      currentStage: InterviewStage.GREETING,
+      coveredConcepts: [],
       currentQuestionId: question?.id ?? null,
       transcript: [],
     });
@@ -193,17 +202,17 @@ export class InterviewService {
     }
 
     const session = await this.getSession(sessionId);
-    const question = session.currentQuestion;
+    const state = this.orchestrator.initSession(session);
+    const systemInstruction = this.orchestrator.getInitialInstruction(session);
 
-    const systemInstruction = [
-      `You are a senior technical interviewer conducting an adaptive technical interview.`,
-      `Target Role: ${session.targetRole} (${session.experienceLevel}).`,
-      `Interview Mode: ${session.mode}. Tone: ${session.personality}.`,
-      question
-        ? `Current Question Topic: "${question.title}". Problem Stem: "${question.stem}". Expected Concepts: ${question.expectedConcepts.join(', ')}.`
-        : `Start by greeting the candidate and welcoming them to their ${session.targetRole} interview.`,
-      `Keep your responses conversational, concise, and focused on verifying technical depth. Do not give the answers away. Ask focused follow-up probing questions.`,
-    ].join(' ');
+    this.sessionEventCallbacks.set(sessionId, onEvent);
+
+    // Emit initial orchestrator state
+    onEvent({
+      type: 'orchestrator.state',
+      state,
+      timestamp: Date.now(),
+    });
 
     const provider = this.providerRegistry.getActiveRealtimeProvider();
     const realtimeSession = await provider.createSession({
@@ -211,7 +220,7 @@ export class InterviewService {
       systemInstruction,
     });
 
-    // Wire internal transcript recording
+    // Wire internal transcript recording and orchestrator progression
     realtimeSession.onEvent((event: ConversationEvent) => {
       if (event.type === 'assistant.transcript.final') {
         void this.appendTranscriptTurn(sessionId, {
@@ -227,6 +236,24 @@ export class InterviewService {
           text: event.text,
           timestamp: event.timestamp,
         });
+
+        // Trigger orchestrator stage & concept evaluation
+        void this.orchestrator
+          .processCandidateTurn(session, event.text)
+          .then((orchResult) => {
+            if (orchResult.transition) {
+              onEvent({
+                type: 'orchestrator.transition',
+                transition: orchResult.transition,
+                timestamp: Date.now(),
+              });
+            }
+            onEvent({
+              type: 'orchestrator.state',
+              state: orchResult.state,
+              timestamp: Date.now(),
+            });
+          });
       }
 
       onEvent(event);
@@ -262,6 +289,29 @@ export class InterviewService {
         text,
         timestamp: Date.now(),
       });
+
+      // Advance orchestrator for text turn
+      const session = await this.getSession(sessionId);
+      const orchResult = await this.orchestrator.processCandidateTurn(
+        session,
+        text,
+      );
+      const callback = this.sessionEventCallbacks.get(sessionId);
+      if (callback) {
+        if (orchResult.transition) {
+          callback({
+            type: 'orchestrator.transition',
+            transition: orchResult.transition,
+            timestamp: Date.now(),
+          });
+        }
+        callback({
+          type: 'orchestrator.state',
+          state: orchResult.state,
+          timestamp: Date.now(),
+        });
+      }
+
       await bridge.sendText(text);
     }
   }
@@ -284,8 +334,16 @@ export class InterviewService {
     if (bridge) {
       await bridge.close();
       this.activeRealtimeSessions.delete(sessionId);
+      this.sessionEventCallbacks.delete(sessionId);
       this.logger.log(`Closed realtime bridge for session ${sessionId}`);
     }
+  }
+
+  /**
+   * Get the orchestrator state for a session.
+   */
+  getOrchestratorState(sessionId: string) {
+    return this.orchestrator.getState(sessionId);
   }
 
   /**
@@ -304,6 +362,8 @@ export class InterviewService {
       personality: session.personality,
       mode: session.mode,
       status: session.status,
+      currentStage: session.currentStage || InterviewStage.GREETING,
+      coveredConcepts: session.coveredConcepts || [],
       currentQuestion: session.currentQuestion
         ? {
             id: session.currentQuestion.id,

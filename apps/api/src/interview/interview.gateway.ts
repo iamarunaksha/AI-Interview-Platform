@@ -86,14 +86,6 @@ export class InterviewGateway
           client.emit('conversation.event', event);
         },
       );
-
-      // Confirm session ready
-      const readyEvent: ConversationEvent = {
-        type: 'session.ready',
-        timestamp: Date.now(),
-      };
-      client.emit('session.ready', readyEvent);
-      client.emit('conversation.event', readyEvent);
     } catch (err) {
       this.logger.error(`Error joining session ${sessionId}:`, err);
       client.emit('session.error', {

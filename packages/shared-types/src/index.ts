@@ -58,6 +58,16 @@ export enum InterviewStatus {
   ERROR = "error",
 }
 
+/** Finite State Machine Stages of an Interview */
+export enum InterviewStage {
+  GREETING = "greeting",
+  PROBLEM_FRAMING = "problem_framing",
+  PROBING = "probing",
+  DEEP_DIVE = "deep_dive",
+  WRAP_UP = "wrap_up",
+  CONCLUDED = "concluded",
+}
+
 /** Interview mode determines behavior policies */
 export enum InterviewMode {
   PRACTICE = "practice",
@@ -250,12 +260,34 @@ export interface InterviewSessionResponse {
   personality: InterviewerPersonality;
   mode: InterviewMode;
   status: InterviewStatus;
+  currentStage: InterviewStage;
+  coveredConcepts: string[];
   currentQuestion?: QuestionResponse | null;
   transcript: TranscriptTurn[];
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface OrchestratorState {
+  sessionId: string;
+  stage: InterviewStage;
+  turnCount: number;
+  stageTurnCount: number;
+  stageStartedAt: number;
+  coveredConcepts: string[];
+  remainingConcepts: string[];
+  activeProbingQuestion?: ProbingQuestion | null;
+  timeAllocations: Record<InterviewStage, number>; // in seconds
+  elapsedSeconds: number;
+}
+
+export interface OrchestratorTransitionEvent {
+  fromStage: InterviewStage;
+  toStage: InterviewStage;
+  reason: string;
+  timestamp: number;
 }
 
 // ---- Conversation Event Types ----
@@ -277,7 +309,13 @@ export type ConversationEvent =
   | { type: "turn.completed"; timestamp: number }
   | { type: "interview.status"; status: InterviewStatus; timestamp: number }
   | { type: "session.error"; code: string; message: string; timestamp: number }
-  | { type: "session.ended"; reason: string; timestamp: number };
+  | { type: "session.ended"; reason: string; timestamp: number }
+  | { type: "orchestrator.state"; state: OrchestratorState; timestamp: number }
+  | {
+      type: "orchestrator.transition";
+      transition: OrchestratorTransitionEvent;
+      timestamp: number;
+    };
 
 // ---- Evidence Types ----
 
