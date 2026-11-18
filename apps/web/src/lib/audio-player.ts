@@ -1,13 +1,17 @@
 /**
  * Browser Audio Player Pipeline.
  *
- * Plays incoming audio chunks via Web Audio API.
- * Provides fallback to Web Speech API synthesis for simulated or text-only turns.
+ * Plays incoming audio chunks via Web Audio API with sequential time-scheduling.
+ * Provides fallback to Web Speech API synthesis for simulated or text-only turns
+ * with strict deduplication to prevent repetitive speech loops.
  */
 export class AudioPlayerPipeline {
   private audioContext: AudioContext | null = null;
   private isMuted = false;
   private isSpeaking = false;
+  private nextPcmStartTime = 0;
+  private lastSpokenText = "";
+  private lastSpokenTimestamp = 0;
 
   constructor() {}
 
@@ -35,6 +39,7 @@ export class AudioPlayerPipeline {
 
   /**
    * Play 16-bit PCM mono audio chunk (e.g. from Gemini or Deepgram)
+   * Scheduled sequentially on the Web Audio timeline to prevent overlapping metallic stutter.
    */
   async playPcmChunk(
     pcmData: Uint8Array | ArrayBuffer,
@@ -54,6 +59,8 @@ export class AudioPlayerPipeline {
             );
 
       const int16 = new Int16Array(buffer);
+      if (int16.length === 0) return;
+
       const float32 = new Float32Array(int16.length);
       for (let i = 0; i < int16.length; i++) {
         float32[i] = int16[i] / 32768.0;
@@ -65,14 +72,27 @@ export class AudioPlayerPipeline {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(ctx.destination);
-      source.start();
+
+      const now = ctx.currentTime;
+      // Schedule sequentially: if nextPcmStartTime is in the past, start now; otherwise queue right after previous chunk
+      const startTime = Math.max(now, this.nextPcmStartTime);
+      source.start(startTime);
+      this.nextPcmStartTime = startTime + audioBuffer.duration;
+      this.isSpeaking = true;
+
+      source.onended = () => {
+        if (ctx.currentTime >= this.nextPcmStartTime - 0.05) {
+          this.isSpeaking = false;
+        }
+      };
     } catch (err) {
       console.warn("PCM audio decode/playback error:", err);
     }
   }
 
   /**
-   * Speak text response via browser Web Speech API (fallback TTS)
+   * Speak text response via browser Web Speech API (fallback TTS).
+   * Enforces deduplication to prevent repeated questions and audio distortion.
    */
   speakText(text: string, onEnd?: () => void): void {
     if (
@@ -84,9 +104,28 @@ export class AudioPlayerPipeline {
       return;
     }
 
+    const cleanText = text.trim();
+    if (!cleanText) {
+      onEnd?.();
+      return;
+    }
+
+    const now = Date.now();
+    // Prevent repeating the same question/text if already spoken in the last 4 seconds
+    if (
+      cleanText === this.lastSpokenText &&
+      now - this.lastSpokenTimestamp < 4000
+    ) {
+      onEnd?.();
+      return;
+    }
+
+    this.lastSpokenText = cleanText;
+    this.lastSpokenTimestamp = now;
+
     try {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.rate = 1.05;
       utterance.pitch = 1.0;
 
@@ -114,6 +153,7 @@ export class AudioPlayerPipeline {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
+    this.nextPcmStartTime = 0;
     this.isSpeaking = false;
   }
 

@@ -58,6 +58,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
   const [isMicActive, setIsMicActive] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
+  const isAssistantSpeakingRef = useRef(false);
   const [isPaused, setIsPaused] = useState(false);
 
   // Refs for recorders to avoid stale closures
@@ -85,6 +86,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
       case "assistant.response.started":
         setIsAssistantSpeaking(true);
+        isAssistantSpeakingRef.current = true;
         setStreamingRole(MessageRole.ASSISTANT);
         setStreamingDelta("");
         break;
@@ -95,29 +97,43 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
       case "assistant.transcript.final":
         setStreamingDelta(null);
-        setTranscript((prev) => [
-          ...prev,
-          {
-            id: `turn-ast-${Date.now()}`,
-            role: MessageRole.ASSISTANT,
-            text: event.text,
-            timestamp: event.timestamp,
-          },
-        ]);
+        setTranscript((prev) => {
+          const lastTurn = prev[prev.length - 1];
+          // Deduplicate if identical to immediately preceding assistant message
+          if (
+            lastTurn &&
+            lastTurn.role === MessageRole.ASSISTANT &&
+            lastTurn.text.trim() === event.text.trim()
+          ) {
+            return prev;
+          }
+          return [
+            ...prev,
+            {
+              id: `turn-ast-${Date.now()}`,
+              role: MessageRole.ASSISTANT,
+              text: event.text,
+              timestamp: event.timestamp,
+            },
+          ];
+        });
         // Speak out loud via browser speech synthesis fallback
         audioPlayer.speakText(event.text, () => {
           setIsAssistantSpeaking(false);
+          isAssistantSpeakingRef.current = false;
         });
         break;
 
       case "assistant.audio.chunk":
         setIsAssistantSpeaking(true);
+        isAssistantSpeakingRef.current = true;
         void audioPlayer.playPcmChunk(event.audio);
         break;
 
       case "assistant.interrupted":
         audioPlayer.stopAll();
         setIsAssistantSpeaking(false);
+        isAssistantSpeakingRef.current = false;
         setStreamingDelta(null);
         break;
 
@@ -159,6 +175,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
         recorderRef.current?.stop();
         setIsMicActive(false);
         setIsAssistantSpeaking(false);
+        isAssistantSpeakingRef.current = false;
         setSession((prev) =>
           prev ? { ...prev, status: InterviewStatus.COMPLETED } : null,
         );
@@ -227,7 +244,11 @@ export default function InterviewRoomPage({ params }: PageProps) {
     // Instantiate recorder
     const recorder = new AudioRecorderPipeline({
       onVolumeChange: (vol) => setMicVolume(vol),
-      onAudioChunk: (chunk) => interviewSocket.sendAudioChunk(chunk),
+      onAudioChunk: (chunk) => {
+        // Suppress acoustic echo: do not send audio chunks while assistant is speaking
+        if (isAssistantSpeakingRef.current) return;
+        interviewSocket.sendAudioChunk(chunk);
+      },
     });
     recorderRef.current = recorder;
 

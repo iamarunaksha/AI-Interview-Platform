@@ -172,6 +172,19 @@ export class MockAiAdapter
 
 class MockRealtimeSession implements IRealtimeSession {
   private eventHandlers: Array<(event: ConversationEvent) => void> = [];
+  private isCandidateSpeaking = false;
+  private isAssistantSpeaking = false;
+  private audioSilenceTimer: NodeJS.Timeout | null = null;
+  private turnCount = 0;
+  private lastTurnTimestamp = 0;
+
+  private readonly questions = [
+    'Could you walk me through your high-level architecture and how requests flow through the system?',
+    'Good. How do you handle cache invalidation and ensure strong data consistency under partition failures?',
+    'Interesting. How do you prevent race conditions when multiple concurrent nodes attempt to mutate the state?',
+    'How would you monitor and measure p99 latency spikes and handle circuit breaker fallbacks in production?',
+    'That was a thorough technical breakdown. Let us explore edge cases and how your service fails over under region outages.',
+  ];
 
   constructor(readonly sessionId: string) {
     // Emit session.ready after tick
@@ -181,40 +194,102 @@ class MockRealtimeSession implements IRealtimeSession {
   }
 
   async sendAudio(_pcmChunk: Buffer | Uint8Array): Promise<void> {
-    // In mock mode, acknowledge speech
-    this.emit({ type: 'candidate.speech.started', timestamp: Date.now() });
+    const now = Date.now();
+    // Ignore incoming audio if assistant is speaking or turn was finalized recently to avoid acoustic echo loops
+    if (this.isAssistantSpeaking || now - this.lastTurnTimestamp < 1500) {
+      return;
+    }
+
+    if (!this.isCandidateSpeaking) {
+      this.isCandidateSpeaking = true;
+      this.emit({ type: 'candidate.speech.started', timestamp: now });
+    }
+
+    // Reset silence timer on every chunk (simulating voice activity detection)
+    if (this.audioSilenceTimer) {
+      clearTimeout(this.audioSilenceTimer);
+    }
+
+    // When candidate pauses for 800ms, finalize turn
+    this.audioSilenceTimer = setTimeout(() => {
+      this.finalizeCandidateTurn();
+    }, 800);
+  }
+
+  private finalizeCandidateTurn() {
+    if (!this.isCandidateSpeaking) return;
+    this.isCandidateSpeaking = false;
+    const now = Date.now();
+    this.lastTurnTimestamp = now;
+
+    this.emit({
+      type: 'candidate.transcript.final',
+      text: 'In our architecture, we use distributed token bucket rate limiting in Redis with write-through caching and master-replica failover to keep p99 latency low.',
+      timestamp: now,
+    });
+    this.emit({ type: 'candidate.speech.ended', timestamp: now });
+
+    // Assistant responds after short pause
     setTimeout(() => {
-      this.emit({
-        type: 'candidate.transcript.final',
-        text: 'I would use a distributed token bucket in Redis.',
-        timestamp: Date.now(),
-      });
-      this.emit({ type: 'candidate.speech.ended', timestamp: Date.now() });
+      this.isAssistantSpeaking = true;
       this.emit({ type: 'assistant.response.started', timestamp: Date.now() });
+
+      const nextQuestion =
+        this.questions[this.turnCount % this.questions.length];
+      this.turnCount++;
+
       this.emit({
         type: 'assistant.transcript.final',
-        text: 'Good. How do you prevent race conditions when multiple instances request tokens simultaneously?',
+        text: nextQuestion,
         timestamp: Date.now(),
       });
       this.emit({ type: 'turn.completed', timestamp: Date.now() });
-    }, 50);
+
+      // Assistant finishes speaking after simulated duration
+      setTimeout(() => {
+        this.isAssistantSpeaking = false;
+      }, 2500);
+    }, 400);
   }
 
   async sendText(text: string): Promise<void> {
-    this.emit({ type: 'assistant.response.started', timestamp: Date.now() });
+    const now = Date.now();
+    this.lastTurnTimestamp = now;
+    this.isAssistantSpeaking = true;
+    this.emit({ type: 'assistant.response.started', timestamp: now });
+
+    const nextQuestion = this.questions[this.turnCount % this.questions.length];
+    this.turnCount++;
+
     this.emit({
       type: 'assistant.transcript.final',
-      text: `Acknowledged: ${text}`,
+      text: `Acknowledged: "${text.slice(0, 40)}...". ${nextQuestion}`,
       timestamp: Date.now(),
     });
     this.emit({ type: 'turn.completed', timestamp: Date.now() });
+
+    setTimeout(() => {
+      this.isAssistantSpeaking = false;
+    }, 2000);
   }
 
   async interrupt(): Promise<void> {
+    if (this.audioSilenceTimer) {
+      clearTimeout(this.audioSilenceTimer);
+      this.audioSilenceTimer = null;
+    }
+    this.isCandidateSpeaking = false;
+    this.isAssistantSpeaking = false;
     this.emit({ type: 'assistant.interrupted', timestamp: Date.now() });
   }
 
   async close(): Promise<void> {
+    if (this.audioSilenceTimer) {
+      clearTimeout(this.audioSilenceTimer);
+      this.audioSilenceTimer = null;
+    }
+    this.isCandidateSpeaking = false;
+    this.isAssistantSpeaking = false;
     this.emit({
       type: 'session.ended',
       reason: 'client_requested',
