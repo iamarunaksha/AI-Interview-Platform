@@ -110,6 +110,27 @@ export default function TracksPage() {
         </button>
       </div>
 
+      {selectedDomain === ProfessionalDomain.SAP && (
+        <div className="mb-8 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs">
+          <div className="flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400 mb-1">
+            <span>⚡ Enterprise SAP Architecture &amp; Clean Core Tracks</span>
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-[10px]">
+              Phase 12 Specialization
+            </span>
+          </div>
+          <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+            Evaluates candidates across the 5 enterprise SAP pillars:{" "}
+            <strong>ABAP RAP &amp; CDS Views</strong>,{" "}
+            <strong>S/4HANA Clean Core Architecture</strong>,{" "}
+            <strong>SAP BTP &amp; Integration Suite (CPI)</strong>,{" "}
+            <strong>SAP TM &amp; Supply Chain Logistics</strong>, and{" "}
+            <strong>S/4HANA Finance (FICO)</strong>. Strictly tests Clean Core
+            upgrade compliance, SAP LUW transactional buffers, and released C1
+            API contracts.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Competency Framework */}
         <div className="space-y-6">

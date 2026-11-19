@@ -41,11 +41,43 @@ export const INITIAL_COMPETENCIES = [
   },
   {
     domain: ProfessionalDomain.SAP,
-    name: 'SAP Transportation Management (TM)',
+    name: 'ABAP RESTful Application Programming Model (RAP) & CDS',
+    slug: 'sap_abap_rap',
+    category: 'Enterprise Technical Development',
+    description:
+      'Core Data Services (CDS), Behavior Definitions (BDEF), determinations, validations, actions, draft buffer handling, code pushdown to SAP HANA, and ABAP Cloud syntax.',
+  },
+  {
+    domain: ProfessionalDomain.SAP,
+    name: 'SAP S/4HANA Enterprise Core & Clean Core Architecture',
+    slug: 'sap_s4hana_core_clean_core',
+    category: 'Enterprise Architecture',
+    description:
+      'Universal Journal (ACDOCA), Business Partner (BUT000 / CVI), 3-tier Clean Core extensibility (Key User, Embedded Steampunk, Side-by-Side BTP), and upgrade stability.',
+  },
+  {
+    domain: ProfessionalDomain.SAP,
+    name: 'SAP BTP, Integration Suite & Cloud Architecture',
+    slug: 'sap_btp_cloud_integration',
+    category: 'Cloud & Integration Architecture',
+    description:
+      'Cloud Integration (CPI) iFlows, error handling subprocesses, idempotent receivers, SAP Event Mesh, Cloud Application Programming (CAP), and Destination Services.',
+  },
+  {
+    domain: ProfessionalDomain.SAP,
+    name: 'SAP Transportation Management (TM) & Supply Chain Logistics',
     slug: 'sap_tm_logistics',
     category: 'Enterprise Functional Architecture',
     description:
-      'Transportation cockpit, freight units, charge calculation, carrier selection, ERP/EWM integration, and logistics optimization.',
+      'Freight Unit Building Rules (FUBR), Transportation Cockpit optimization, Incompatibility Rules, Freight Orders, Carrier selection, and ERP/EWM integration.',
+  },
+  {
+    domain: ProfessionalDomain.SAP,
+    name: 'SAP S/4HANA Finance (FICO) & Financial Architecture',
+    slug: 'sap_fico_financials',
+    category: 'Financial Systems Architecture',
+    description:
+      'Universal Journal ACDOCA table architecture, Multi-GAAP parallel ledgers, Fast Close, Document Splitting, Margin Analysis (CO-PA), and real-time reconciliation.',
   },
   {
     domain: ProfessionalDomain.SAP,
@@ -409,95 +441,106 @@ export const INITIAL_QUESTIONS = [
     ],
   },
   {
-    competencySlug: 'sap_tm_logistics',
+    competencySlug: 'sap_abap_rap',
     domain: ProfessionalDomain.SAP,
     companyCategories: [
-      CompanyCategory.SAP_CONSULTING,
       CompanyCategory.SAP_PRODUCT,
+      CompanyCategory.SAP_CONSULTING,
       CompanyCategory.SAP_CUSTOMER,
     ],
     experienceLevels: [
-      ExperienceLevel.SDE_1,
       ExperienceLevel.SDE_2,
       ExperienceLevel.SENIOR,
+      ExperienceLevel.STAFF,
     ],
     difficulty: InterviewDifficulty.MEDIUM,
-    title: 'SAP TM Freight Unit Building & Transportation Cockpit',
-    stem: 'In SAP Transportation Management (TM), explain how order demand from S/4HANA Sales Orders or Deliveries is converted into Freight Units (FUs), and how the Transportation Cockpit optimizes capacity planning.',
+    title:
+      'ABAP RAP Architecture: Managed vs Unmanaged Implementation Scenarios',
+    stem: 'When designing an enterprise transactional business object using the ABAP RESTful Application Programming Model (RAP), what architectural criteria determine whether you choose a Managed Scenario versus an Unmanaged Scenario? Explain how determinations, validations, actions, and the RAP Transaction Manager govern the save sequence, and why COMMIT WORK is strictly forbidden in RAP behavior implementations.',
     contextPrompt:
-      'Candidate must explain FUBR (Freight Unit Building Rules), conditions, incompatibility rules, Freight Orders (FO), and Cockpit Gantt/Map optimization.',
+      'Candidate must contrast Managed vs Unmanaged RAP scenarios, explain Behavior Definitions (BDEF) and Behavior Implementation Classes (BIL), transactional phases (interaction phase vs save sequence), early vs late numbering, draft handling, and the fatal runtime dump DYN_CALL_ILLEGAL_COMMIT when COMMIT WORK is called inside RAP.',
     expectedConcepts: [
-      'Freight Unit Building Rule (FUBR) splitting and consolidation based on weight, volume, or pieces',
-      'Incompatibility settings (e.g. hazardous materials vs food products, vehicle type restrictions)',
-      'Planning profile and optimization runs in the Transportation Cockpit',
-      'Freight Order (FO) creation, carrier selection, and tendering',
-      'Integration points with S/4HANA Sales Order (SO) and Outbound Delivery (OBD)',
+      'Managed Scenario uses framework-orchestrated standard CRUD and buffer handling automatically',
+      'Unmanaged Scenario delegates persistence, locking, and buffer logic to custom legacy code or BAPIs',
+      'Behavior Definition (BDEF) declares determinations, validations, actions, draft capability, and authorization master',
+      'Interaction phase (read, modify) versus Save sequence (finalize, check_before_save, save, cleanup)',
+      'Strict prohibition of COMMIT WORK / ROLLBACK WORK inside behavior methods (dump DYN_CALL_ILLEGAL_COMMIT); RAP transaction manager controls the LUW',
+      'Early numbering (managed UUID or number range in interaction phase) vs Late numbering (assigned during save phase)',
     ],
     commonMisconceptions: [
-      'Confusing Freight Unit with Freight Order (FU is demand; FO is execution/capacity)',
-      'Assuming FUBR only splits on item quantity without considering weight/volume limits or incompatibilities',
+      'Calling COMMIT WORK inside a RAP determination or save method (causes runtime crash DYN_CALL_ILLEGAL_COMMIT)',
+      'Assuming Unmanaged RAP scenarios cannot support draft handling or Fiori Elements (draft is supported in unmanaged with custom draft query/save)',
+      'Confusing Determinations (side-effects executed on modify/save) with Validations (consistency checks returning failed/reported keys)',
     ],
     probingQuestions: [
       {
-        id: 'probe-tm-1',
+        id: 'probe-rap-1',
         probeText:
-          'What is the precise architectural distinction between a Freight Unit (FU) and a Freight Order (FO) in SAP TM?',
+          'What happens at runtime if a developer calls COMMIT WORK inside a RAP Determination or Action method, and how does the RAP framework manage transactional integrity instead?',
         targetConcept:
-          'FU represents logistics demand; FO represents execution transport capacity',
+          'Strict prohibition of COMMIT WORK / ROLLBACK WORK inside behavior methods',
         triggerCondition: 'superficial_explanation' as const,
       },
       {
-        id: 'probe-tm-2',
+        id: 'probe-rap-2',
         probeText:
-          'How do Incompatibility Rules in SAP TM prevent illegal cargo combinations (e.g. frozen goods in a standard dry container) during automated VSR optimization?',
-        targetConcept: 'Incompatibility rules evaluated during planning runs',
+          'In an Unmanaged RAP scenario, how do you handle legacy BAPIs that internally perform COMMIT WORK without corrupting the RAP transactional buffer?',
+        targetConcept:
+          'Unmanaged Scenario delegates persistence, locking, and buffer logic to custom legacy code or BAPIs',
         triggerCondition: 'deep_dive' as const,
+      },
+      {
+        id: 'probe-rap-3',
+        probeText:
+          'Explain the difference between Early Numbering and Late Numbering in RAP. In what business scenarios is Late Numbering mandatory?',
+        targetConcept: 'Early numbering vs Late numbering mechanics',
+        triggerCondition: 'missing_concept' as const,
       },
     ],
     rubricGuide: [
       {
         rating: EvaluationRating.POOR,
         description:
-          'Confuses standard ERP shipping with TM architecture; cannot articulate what FUBR is.',
+          'Confuses classic ABAP OO with RAP; does not understand why COMMIT WORK causes a crash in RAP.',
         keyIndicators: [
-          'Does not know FUBR',
-          'Confuses shipment document with Freight Order',
+          'Unaware of RAP transaction manager',
+          'Does not understand Managed vs Unmanaged distinction',
         ],
       },
       {
         rating: EvaluationRating.DEVELOPING,
         description:
-          'Explains Freight Units, but vague on Cockpit optimization parameters or incompatibility handling.',
+          'Explains Managed vs Unmanaged at a high level, but lacks clarity on RAP save sequence phases or draft buffer lifecycle.',
         keyIndicators: [
-          'Knows FU concept',
-          'Unclear on VSR optimization steps',
-          'Vague ERP integration flow',
+          'Knows BDEF exists',
+          'Vague on save sequence phases',
+          'Unclear on early vs late numbering',
         ],
       },
       {
         rating: EvaluationRating.PROFICIENT,
         description:
-          'Strong architectural command of FUBR, incompatibility matrices, Transportation Cockpit profiles, and carrier tendering.',
+          'Clear mastery of BDEF, determination/validation triggers, early vs late numbering, and RAP transaction manager integrity.',
         keyIndicators: [
-          'Clear FUBR configuration logic',
-          'Incompatibility definitions',
-          'S/4HANA SO to FO end-to-end integration flow',
+          'Precise explanation of Managed vs Unmanaged trade-offs',
+          'Articulates save sequence: finalize, check_before_save, save',
+          'Highlights prohibition of COMMIT WORK',
         ],
       },
       {
         rating: EvaluationRating.STRONG,
         description:
-          'Expert implementation mastery: multi-stage routing, carrier charge calculation sheet (TCCS), settlement with ERP MM, and BAdI enhancement spots.',
+          'Advanced enterprise mastery: unmanaged save sequence wrapping legacy BAPIs, side-effect annotations, ETag concurrency handling, and ABAP Cloud compliance.',
         keyIndicators: [
-          'Transportation Charge Management (TCM) integration',
-          'Freight settlement document (FSD) to PO/SES',
-          'Custom FUBR BAdI extensions',
+          'Unmanaged buffer management with legacy BAPIs',
+          'Optimistic locking via total ETag / entity ETag',
+          'ABAP Cloud release contracts and strict syntax compliance',
         ],
       },
     ],
   },
   {
-    competencySlug: 'sap_abap_development',
+    competencySlug: 'sap_abap_rap',
     domain: ProfessionalDomain.SAP,
     companyCategories: [
       CompanyCategory.SAP_PRODUCT,
@@ -581,6 +624,734 @@ export const INITIAL_QUESTIONS = [
           'AMDP table functions for complex native HANA calculations',
           'DCL data control authorization modeling',
           'ABAP RESTful Application Programming (RAP) integration',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sap_s4hana_core_clean_core',
+    domain: ProfessionalDomain.SAP,
+    companyCategories: [
+      CompanyCategory.SAP_PRODUCT,
+      CompanyCategory.SAP_CONSULTING,
+      CompanyCategory.SAP_CUSTOMER,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+      ExperienceLevel.STAFF,
+    ],
+    difficulty: InterviewDifficulty.HARD,
+    title:
+      'SAP Clean Core Strategy: In-App Extensibility vs Side-by-Side Extensibility on BTP',
+    stem: "Explain SAP's Clean Core strategy for S/4HANA Cloud and On-Premise. How do you systematically evaluate whether a business requirement should be implemented via Tier 1 (Key User In-App Extensibility), Tier 2 (Developer Extensibility / Embedded Steampunk via ABAP Cloud), or Tier 3 (Side-by-Side Extensibility on SAP BTP)? What are the architectural hazards of classic modifications?",
+    contextPrompt:
+      'Candidate must detail the 3-tier Clean Core extensibility model, Key User tools (Fiori Custom Fields and Logic), Developer Extensibility (Embedded Steampunk with released C1 APIs and ABAP Cloud language version), Side-by-Side BTP (CAP, Event Mesh, decoupled lifecycle), and explain how classic core modifications (SSCR, user exits, direct table updates) block upgrades.',
+    expectedConcepts: [
+      'Clean Core 3-tier extensibility hierarchy (Tier 1: Key User, Tier 2: Developer Extensibility, Tier 3: Side-by-Side BTP)',
+      'Tier 1 Key User Extensibility: low-code Fiori apps for custom fields, logic, and UI adaptations without developer IDE',
+      'Tier 2 Developer Extensibility (Embedded Steampunk): restricted ABAP Cloud language version executing directly on S/4HANA stack using released C1 APIs',
+      'Tier 3 Side-by-Side Extensibility on SAP BTP: autonomous cloud microservices (CAP, Node.js/Java, Event Mesh) decoupled from ERP upgrade cycles',
+      'Released API contracts: Contract C1 for system-internal public interfaces and Contract C2 for extension points / BAdIs',
+      'Classic modifications (Tier 4) break upgrade automation, create testing debt, and violate Clean Core governance',
+    ],
+    commonMisconceptions: [
+      'Thinking Clean Core means zero custom code can ever reside on the S/4HANA box (Embedded Steampunk / Tier 2 is fully Clean Core compliant)',
+      'Assuming BTP side-by-side extensibility should be used for high-frequency synchronous operational loops where latency to ERP is critical',
+      'Believing classic BAdIs or user exits in custom namespaces (Z*) are automatically Clean Core compliant without released API contracts',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-clean-1',
+        probeText:
+          'If a requirement demands sub-millisecond access to millions of Universal Journal (ACDOCA) records with transactional updates, which Clean Core tier is appropriate and why?',
+        targetConcept:
+          'Tier 2 Developer Extensibility (Embedded Steampunk): restricted ABAP Cloud language version executing directly on S/4HANA stack',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-clean-2',
+        probeText:
+          'What is the architectural significance of the SAP Release Contract C1, and what happens during the ABAP Cloud syntax check if code calls an unreleased standard SAP function module or table?',
+        targetConcept:
+          'Released API contracts: Contract C1 for system-internal public interfaces and Contract C2 for extension points / BAdIs',
+        triggerCondition: 'missing_concept' as const,
+      },
+      {
+        id: 'probe-clean-3',
+        probeText:
+          'How do you guide an enterprise client with thousands of legacy Z-programs and modifications through a Clean Core remediation and migration path?',
+        targetConcept:
+          'Classic modifications (Tier 4) break upgrade automation, create testing debt, and violate Clean Core governance',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Unaware of Clean Core tiers; recommends classic user exits or direct database modifications.',
+        keyIndicators: [
+          'No understanding of Clean Core',
+          'Advocates direct modification of SAP standard objects',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Understands Key User vs BTP, but unfamiliar with Developer Extensibility / Embedded Steampunk and released C1 API governance.',
+        keyIndicators: [
+          'Knows BTP exists for custom apps',
+          'Unclear on Embedded Steampunk vs classic ABAP',
+          'Vague on release contracts C1/C2',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Clear decision criteria across all 3 tiers, released contract mechanisms, and upgrade isolation advantages.',
+        keyIndicators: [
+          'Comprehensive 3-tier classification',
+          'Explains ABAP Cloud language version restrictions',
+          'Released API and BAdI upgrade stability',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Masterful architectural evaluation: custom code remediation via ABAP Test Cockpit (ATC) with Clean Core variant, side-by-side event decoupling, and total cost of ownership (TCO) impact.',
+        keyIndicators: [
+          'ABAP Test Cockpit (ATC) Clean Core checks and custom code migration apps',
+          'Event-driven side-by-side decoupling with SAP Event Mesh',
+          'Clear governance model for enterprise ERP lifecycle',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sap_s4hana_core_clean_core',
+    domain: ProfessionalDomain.SAP,
+    companyCategories: [
+      CompanyCategory.SAP_PRODUCT,
+      CompanyCategory.SAP_CONSULTING,
+      CompanyCategory.SAP_CUSTOMER,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+      ExperienceLevel.STAFF,
+    ],
+    difficulty: InterviewDifficulty.MEDIUM,
+    title:
+      'S/4HANA Universal Journal (ACDOCA) & Business Partner (CVI) Architecture',
+    stem: 'How does the Universal Journal table ACDOCA in SAP S/4HANA structurally eliminate the classic reconciliation requirements between Financial Accounting (FI) and Controlling (CO)? Also explain the architectural transition from legacy Customer/Vendor masters (KNA1, LFA1) to the unified Business Partner (BUT000 / CVI).',
+    contextPrompt:
+      'Candidate must explain the consolidation of FI-GL, FI-AA, CO, and ML into ACDOCA, removal of reconciliation ledgers, single source of truth, elimination of the 999,999 item limit, and Customer-Vendor Integration (CVI) mapping to BUT000.',
+    expectedConcepts: [
+      'ACDOCA unifies General Ledger (BKPF/BSEG), Controlling (COEP), Asset Accounting (ANEP), and Material Ledger into a single table',
+      'Eliminates classic month-end reconciliation between FI and CO; secondary cost elements are now G/L accounts',
+      'Elimination of the historic 999,999 line item limit per financial document',
+      'Business Partner (table BUT000) acts as single master entity linked via Customer-Vendor Integration (CVI) to legacy tables for backwards compatibility',
+      'Parallel ledgers and multiple currencies recorded in real time on the same line item',
+    ],
+    commonMisconceptions: [
+      'Believing BSEG and KNA1/LFA1 were deleted in S/4HANA (they exist as compatibility views or synchronization targets via CVI)',
+      'Thinking secondary cost elements still require a separate CO document number range distinct from G/L documents',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-acdoca-1',
+        probeText:
+          'In S/4HANA, what happened to secondary cost elements, and how are CO allocations reflected in the general ledger?',
+        targetConcept:
+          'Eliminates classic month-end reconciliation between FI and CO; secondary cost elements are now G/L accounts',
+        triggerCondition: 'missing_concept' as const,
+      },
+      {
+        id: 'probe-acdoca-2',
+        probeText:
+          'During S/4HANA greenfield or brownfield migrations, why is Customer-Vendor Integration (CVI) synchronization considered the most critical pre-requisite?',
+        targetConcept:
+          'Business Partner (table BUT000) acts as single master entity linked via Customer-Vendor Integration (CVI)',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Cannot explain ACDOCA or why FI and CO were reconciled in legacy ECC.',
+        keyIndicators: [
+          'Confuses S/4HANA table architecture with ECC tables',
+          'Unaware of Business Partner CVI unification',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Explains ACDOCA unifies tables, but unclear on CVI or secondary cost element accounting.',
+        keyIndicators: [
+          'Knows ACDOCA exists',
+          'Unclear on secondary cost elements as G/L accounts',
+          'Vague on CVI pre-migration requirements',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Accurate breakdown of ACDOCA line items, CVI data model, and compatibility view mechanics.',
+        keyIndicators: [
+          'Explains single source of truth and no reconciliation ledgers',
+          'Accurate BUT000 and CVI role assignments',
+          'Parallel ledger line items in ACDOCA',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Deep expertise in real-time document splitting, multi-ledger posting, extension ledgers, and CVI pre-migration check reports.',
+        keyIndicators: [
+          'Extension ledger delta posting mechanisms',
+          'CVI synchronization Cockpit and MDS_LOAD_COCKPIT',
+          'Universal Journal memory footprint optimization on SAP HANA',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sap_btp_cloud_integration',
+    domain: ProfessionalDomain.SAP,
+    companyCategories: [
+      CompanyCategory.SAP_PRODUCT,
+      CompanyCategory.SAP_CONSULTING,
+      CompanyCategory.SAP_CUSTOMER,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_1,
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+    ],
+    difficulty: InterviewDifficulty.MEDIUM,
+    title:
+      'Enterprise Integration with SAP Cloud Integration (CPI): Resilient iFlow Design',
+    stem: 'How do you architect an asynchronous, fault-tolerant integration flow (iFlow) in SAP Cloud Integration (CPI) between S/4HANA and an external third-party cloud application? Detail how you implement the Idempotent Receiver pattern, Exception Subprocesses, and secure credential handling via the BTP Destination Service.',
+    contextPrompt:
+      'Candidate should explain CPI iFlow architecture, Idempotent Receiver pattern to prevent duplicate processing, Exception Subprocess routing with alert notifications, BTP Destination Service with OAuth 2.0/mTLS, and SAP Cloud Connector for on-premise connectivity.',
+    expectedConcepts: [
+      'Cloud Integration (CPI) iFlow architecture with sender/receiver channels, message mapping, and content transformers',
+      'Idempotent Receiver pattern: message ID deduplication store to prevent duplicate postings upon network retries',
+      'Exception Subprocess handling: catching runtime failures, generating standardized error payloads, and alerting',
+      'Secure credential management via BTP Destination Service using OAuth 2.0 or mTLS certificates without hardcoding',
+      'SAP Cloud Connector: reverse-proxy TLS tunnel enabling secure outbound-initiated connection to on-premise S/4HANA',
+      'Splitter / Aggregator and Content Enricher patterns for high-volume batch payloads',
+    ],
+    commonMisconceptions: [
+      'Assuming retry mechanisms alone solve transmission failures without an idempotent receiver (causes duplicate billing or order creation)',
+      'Hardcoding API keys or endpoints in Groovy scripts instead of using BTP Secure Store and Destinations',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-cpi-1',
+        probeText:
+          'If an external vendor sends the same transaction payload twice due to a timeout retry, how does your CPI iFlow ensure it is only posted once in S/4HANA?',
+        targetConcept:
+          'Idempotent Receiver pattern: message ID deduplication store to prevent duplicate postings',
+        triggerCondition: 'missing_concept' as const,
+      },
+      {
+        id: 'probe-cpi-2',
+        probeText:
+          'How does SAP Cloud Connector allow CPI in the public cloud to securely reach an on-premise S/4HANA system without opening any inbound ports on the corporate firewall?',
+        targetConcept:
+          'SAP Cloud Connector: reverse-proxy TLS tunnel enabling secure outbound-initiated connection',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Suggests point-to-point connections with hardcoded credentials; unfamiliar with CPI components.',
+        keyIndicators: [
+          'No understanding of CPI architecture',
+          'Suggests hardcoding credentials in code',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Can build a basic iFlow, but lacks knowledge of Idempotent Receiver pattern or Exception Subprocesses.',
+        keyIndicators: [
+          'Knows basic sender/receiver channels',
+          'Unclear on message deduplication',
+          'Vague on Cloud Connector reverse invoke tunnel',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Comprehensive command of CPI design: message deduplication, secure destinations, Cloud Connector, and exception flows.',
+        keyIndicators: [
+          'Clear Idempotent Receiver implementation',
+          'Standardized Exception Subprocess error handling',
+          'Secure BTP Destination and Cloud Connector configuration',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Enterprise architect level: message queueing (JMS/Event Mesh), Camel simple expression optimization, payload stream handling, and CI/CD for iFlows.',
+        keyIndicators: [
+          'JMS transaction boundaries and dead letter queueing',
+          'Streaming XML/JSON parser for memory efficiency on CPI worker nodes',
+          'Automated iFlow testing via Postman/Newman and transport management (TMS)',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sap_btp_cloud_integration',
+    domain: ProfessionalDomain.SAP,
+    companyCategories: [
+      CompanyCategory.SAP_PRODUCT,
+      CompanyCategory.SAP_CONSULTING,
+      CompanyCategory.SAP_CUSTOMER,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+      ExperienceLevel.STAFF,
+    ],
+    difficulty: InterviewDifficulty.MEDIUM,
+    title:
+      'Event-Driven Architecture with SAP Event Mesh & Cloud Application Programming (CAP)',
+    stem: 'How do you build a responsive, decoupled enterprise application using SAP Event Mesh and the Cloud Application Programming (CAP) model? Describe how standard business events (e.g., Sales Order Created in S/4HANA) are published, routed, and consumed asynchronously.',
+    contextPrompt:
+      'Candidate must explain Event-Driven Architecture (EDA) with SAP Event Mesh, CloudEvents specification, event enablement in S/4HANA, and consuming events in CAP Node.js / Java services.',
+    expectedConcepts: [
+      'Event-Driven Architecture (EDA) decoupling producers and consumers to absorb traffic spikes and isolate outages',
+      'CloudEvents 1.0 open standard format for structured event headers and payloads',
+      'S/4HANA Event Enablement: publishing standard business events via Enterprise Event Enablement framework',
+      'SAP Event Mesh queue subscriptions, topic filters, and message acknowledgment (ACK/NACK)',
+      'CAP framework integration: subscribing to events declaratively using @sap/cds messaging services',
+    ],
+    commonMisconceptions: [
+      'Confusing event notification (lean payload with ID/timestamp) with heavy message transfer (full document dump)',
+      'Assuming synchronous REST calls are as reliable as asynchronous event streaming for distributed systems',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-event-1',
+        probeText:
+          'Why does SAP recommend sending lightweight event notifications (containing only entity ID and event type) rather than full business document payloads in Event Mesh?',
+        targetConcept:
+          'CloudEvents 1.0 open standard format for structured event headers and payloads',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-event-2',
+        probeText:
+          'How does CAP (@sap/cds) handle event consumer failures, dead-letter queues, and message redelivery?',
+        targetConcept:
+          'SAP Event Mesh queue subscriptions, topic filters, and message acknowledgment',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Cannot explain the difference between REST polling and event-driven architecture.',
+        keyIndicators: [
+          'Confuses polling with event streaming',
+          'Unaware of SAP Event Mesh',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Explains message queues, but unfamiliar with SAP Event Mesh or CAP event integration.',
+        keyIndicators: [
+          'Knows publisher/subscriber pattern',
+          'Vague on S/4HANA event enablement',
+          'Unclear on CAP @sap/cds messaging bindings',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Clear mastery of S/4HANA event enablement, Event Mesh topics/queues, and CAP event handlers.',
+        keyIndicators: [
+          'Precise CloudEvents format structure',
+          'Event Mesh queue binding to topics',
+          'Declarative CAP messaging implementation',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Architect-level: event choreography vs orchestration, transactional outbox pattern for guaranteed event delivery, and high-volume scaling.',
+        keyIndicators: [
+          'Transactional outbox pattern in S/4HANA to avoid dual-write hazards',
+          'Advanced Event Mesh (AEM) broker federation',
+          'Dynamic event routing and consumer backpressure management',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sap_tm_logistics',
+    domain: ProfessionalDomain.SAP,
+    companyCategories: [
+      CompanyCategory.SAP_CONSULTING,
+      CompanyCategory.SAP_PRODUCT,
+      CompanyCategory.SAP_CUSTOMER,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_1,
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+    ],
+    difficulty: InterviewDifficulty.MEDIUM,
+    title: 'SAP TM Freight Unit Building & Transportation Cockpit',
+    stem: 'In SAP Transportation Management (TM), explain how order demand from S/4HANA Sales Orders or Deliveries is converted into Freight Units (FUs), and how the Transportation Cockpit optimizes capacity planning.',
+    contextPrompt:
+      'Candidate must explain FUBR (Freight Unit Building Rules), conditions, incompatibility rules, Freight Orders (FO), and Cockpit Gantt/Map optimization.',
+    expectedConcepts: [
+      'Freight Unit Building Rule (FUBR) splitting and consolidation based on weight, volume, or pieces',
+      'Incompatibility settings (e.g. hazardous materials vs food products, vehicle type restrictions)',
+      'Planning profile and optimization runs in the Transportation Cockpit',
+      'Freight Order (FO) creation, carrier selection, and tendering',
+      'Integration points with S/4HANA Sales Order (SO) and Outbound Delivery (OBD)',
+    ],
+    commonMisconceptions: [
+      'Confusing Freight Unit with Freight Order (FU is demand; FO is execution/capacity)',
+      'Assuming FUBR only splits on item quantity without considering weight/volume limits or incompatibilities',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-tm-1',
+        probeText:
+          'What is the precise architectural distinction between a Freight Unit (FU) and a Freight Order (FO) in SAP TM?',
+        targetConcept:
+          'Freight Order (FO) creation, carrier selection, and tendering',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-tm-2',
+        probeText:
+          'How do Incompatibility Rules in SAP TM prevent illegal cargo combinations during automated VSR optimization?',
+        targetConcept:
+          'Incompatibility settings (e.g. hazardous materials vs food products, vehicle type restrictions)',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Confuses standard ERP shipping with TM architecture; cannot articulate what FUBR is.',
+        keyIndicators: [
+          'Does not know FUBR',
+          'Confuses shipment document with Freight Order',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Explains Freight Units, but vague on Cockpit optimization parameters or incompatibility handling.',
+        keyIndicators: [
+          'Knows FU concept',
+          'Unclear on VSR optimization steps',
+          'Vague ERP integration flow',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Strong architectural command of FUBR, incompatibility matrices, Transportation Cockpit profiles, and carrier tendering.',
+        keyIndicators: [
+          'Clear FUBR configuration logic',
+          'Incompatibility definitions',
+          'S/4HANA SO to FO end-to-end integration flow',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Expert implementation mastery: multi-stage routing, carrier charge calculation sheet (TCCS), settlement with ERP MM, and BAdI enhancement spots.',
+        keyIndicators: [
+          'Transportation Charge Management (TCM) integration',
+          'Freight settlement document (FSD) to PO/SES',
+          'Custom FUBR BAdI extensions',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sap_tm_logistics',
+    domain: ProfessionalDomain.SAP,
+    companyCategories: [
+      CompanyCategory.SAP_CONSULTING,
+      CompanyCategory.SAP_PRODUCT,
+      CompanyCategory.SAP_CUSTOMER,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+      ExperienceLevel.STAFF,
+    ],
+    difficulty: InterviewDifficulty.MEDIUM,
+    title: 'SAP TM Incompatibility Management & Multimodal Routing Integration',
+    stem: 'Explain how SAP TM models complex multi-stage transportation chains (e.g., road-rail-sea-road) and how Incompatibility Rules enforce physical, regulatory, and customer-specific routing constraints during automated planning.',
+    contextPrompt:
+      'Candidate must explain multi-stage transport, incompatibility matrices, Transportation Network (locations, lanes, transshipment points), Freight Settlement Documents (FSD), and EWM integration via Transportation Units (TU).',
+    expectedConcepts: [
+      'Multi-stage transportation modeling: pre-carriage, main carriage, and on-carriage legs',
+      'Incompatibility matrices: hazard goods classes, vehicle equipment constraints, carrier-location restrictions',
+      'Transportation Network definition: transshipment locations, transportation lanes, and default routing',
+      'Freight Settlement Document (FSD) integration with S/4HANA MM for automated Purchase Order and Service Entry Sheet creation',
+      'Integration with SAP Extended Warehouse Management (EWM) via Transportation Units (TU) and dock appointment scheduling',
+    ],
+    commonMisconceptions: [
+      'Thinking TM only plans single-leg truck shipments and cannot model multimodal transshipment hubs',
+      'Assuming freight cost settlement requires manual invoice entry instead of automated FSD-to-SES posting',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-tm-multi-1',
+        probeText:
+          'How does SAP TM coordinate the physical handover of cargo between a long-haul carrier and a local warehouse managed by SAP EWM?',
+        targetConcept:
+          'Integration with SAP Extended Warehouse Management (EWM) via Transportation Units (TU)',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-tm-multi-2',
+        probeText:
+          'Explain how Incompatibility Rules interact with the VSR (Vehicle Scheduling and Routing) optimizer during multi-stage routing.',
+        targetConcept:
+          'Incompatibility matrices: hazard goods classes, vehicle equipment constraints, carrier-location restrictions',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Unaware of multi-stage routing or incompatibility concepts.',
+        keyIndicators: [
+          'Cannot describe transportation stages',
+          'Unfamiliar with EWM integration',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Understands legs and transshipment, but vague on EWM integration or FSD settlement.',
+        keyIndicators: [
+          'Understands transshipment locations',
+          'Vague on TU status lifecycle',
+          'Unclear on FSD to MM-SES posting',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Strong grasp of multimodal networks, incompatibility matrices, and EWM TU handshakes.',
+        keyIndicators: [
+          'Accurate multi-stage stage sequence (pre/main/on-carriage)',
+          'Clear incompatibility constraint application in VSR',
+          'Automated FSD to MM Purchase Order and Service Entry Sheet creation',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Masterful architectural knowledge: Charge Calculation Sheet (TCCS) condition tables, dispute management, and container load optimization.',
+        keyIndicators: [
+          'TCCS calculation sheet scales and rates',
+          'Carrier dispute management workflow in SAP TM',
+          '3D package building and container load optimization integration',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sap_fico_financials',
+    domain: ProfessionalDomain.SAP,
+    companyCategories: [
+      CompanyCategory.SAP_PRODUCT,
+      CompanyCategory.SAP_CONSULTING,
+      CompanyCategory.SAP_CUSTOMER,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+      ExperienceLevel.STAFF,
+    ],
+    difficulty: InterviewDifficulty.HARD,
+    title:
+      'Universal Journal (ACDOCA), Parallel Ledgers, and Multi-GAAP Accounting',
+    stem: 'In SAP S/4HANA Finance, explain how the Universal Journal (ACDOCA) handles Multi-GAAP compliance through Parallel Ledgers (Leading vs. Non-Leading ledgers). How does Document Splitting work at the database level to produce balanced balance sheets by Segment and Profit Center?',
+    contextPrompt:
+      'Candidate must explain ACDOCA multi-ledger capabilities, Leading Ledger (0L) vs Non-Leading Ledgers, Document Splitting rules (passive, active, zero-balance clearing), and real-time CO-FI integration.',
+    expectedConcepts: [
+      'Universal Journal (ACDOCA) records all transactions across multiple ledgers simultaneously in real time',
+      'Leading Ledger (0L) represents group reporting standard (e.g., IFRS) while Non-Leading Ledgers handle local statutory GAAPs (e.g., US GAAP, Local GAAP)',
+      'Document Splitting: passive splitting (inheriting account assignments from prior documents like PO or invoice)',
+      'Active (rule-based) document splitting and zero-balance clearing accounts ensuring debit = credit per Profit Center and Segment',
+      'Real-time CO-FI posting: secondary cost elements are G/L accounts, eliminating reconciliation ledgers',
+      'Continuous accounting / Fast Close: financial reports execute directly against ACDOCA without batch balance rollups',
+    ],
+    commonMisconceptions: [
+      'Believing Document Splitting can be easily activated in an already live S/4HANA system without a complex migration project',
+      'Thinking Non-Leading Ledgers duplicate all database records unnecessarily (Extension Ledgers provide delta-only postings)',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-fico-1',
+        probeText:
+          'What is the specific role of the Zero-Balance Clearing Account in S/4HANA Document Splitting when an entry involves multiple segments?',
+        targetConcept:
+          'Active (rule-based) document splitting and zero-balance clearing accounts ensuring debit = credit per Profit Center and Segment',
+        triggerCondition: 'missing_concept' as const,
+      },
+      {
+        id: 'probe-fico-2',
+        probeText:
+          'What is the architectural difference between a standard Non-Leading Ledger and an Extension Ledger in S/4HANA Finance?',
+        targetConcept:
+          'Leading Ledger (0L) represents group reporting standard while Non-Leading Ledgers handle local statutory GAAPs',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Cannot explain parallel ledgers or confuses document splitting with standard payment terms.',
+        keyIndicators: [
+          'Confuses ledgers with company codes',
+          'Unaware of Document Splitting purpose',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Explains Leading vs Non-Leading ledgers, but unclear on Document Splitting zero-balance clearing or Extension Ledgers.',
+        keyIndicators: [
+          'Knows 0L is leading ledger',
+          'Vague on passive vs active document splitting',
+          'Unclear on Extension Ledger mechanics',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Deep technical mastery of ACDOCA multi-GAAP entries, active/passive document splitting, and fast close benefits.',
+        keyIndicators: [
+          'Explains zero-balance clearing entry generation in ACDOCA',
+          'Multi-GAAP parallel ledger valuation postings (foreign currency, depreciation)',
+          'Elimination of batch reconciliation rollups for fast close',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Elite architectural expertise: currency types (Global, Group, Functional), Central Finance (CFIN) replication, and ledger-specific postings (FB01L).',
+        keyIndicators: [
+          'Functional currency configuration and freetree currencies in S/4HANA',
+          'Central Finance (CFIN) real-time replication via SLT into ACDOCA',
+          'Ledger-group postings (FB01L) for adjustment entries',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sap_fico_financials',
+    domain: ProfessionalDomain.SAP,
+    companyCategories: [
+      CompanyCategory.SAP_PRODUCT,
+      CompanyCategory.SAP_CONSULTING,
+      CompanyCategory.SAP_CUSTOMER,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+      ExperienceLevel.STAFF,
+    ],
+    difficulty: InterviewDifficulty.MEDIUM,
+    title: 'S/4HANA Margin Analysis vs Classic Costing-Based CO-PA',
+    stem: 'Why did SAP shift from classic Costing-Based CO-PA (Profitability Analysis) to S/4HANA Margin Analysis (Account-Based CO-PA), and what were the architectural challenges solved in ACDOCA?',
+    contextPrompt:
+      'Candidate must explain Margin Analysis unified in ACDOCA, elimination of reconciliation differences between CE1/CE2 value fields and G/L accounts, real-time COGS splitting, and real-time production variance splitting.',
+    expectedConcepts: [
+      'Margin Analysis is fully unified with General Ledger in ACDOCA using standard G/L accounts rather than separate value fields',
+      'Eliminates permanent reconciliation gaps between classic CO-PA (CE1/CE2/CE3 tables) and G/L accounting (BKPF/BSEG)',
+      'Real-time Cost of Goods Sold (COGS) splitting across multiple G/L accounts at Goods Issue based on standard cost component split',
+      'Real-time production variance splitting at order settlement directly into variance category G/L accounts',
+      'Predictive accounting integration: creating simulated ACDOCA records from incoming sales orders before billing',
+    ],
+    commonMisconceptions: [
+      "Assuming Costing-Based CO-PA is the default in S/4HANA (Margin Analysis is SAP's strategic direction)",
+      'Thinking Margin Analysis cannot split COGS or variances like costing-based CO-PA did (it does so natively at the G/L level)',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-margin-1',
+        probeText:
+          'In classic ECC, why was reconciling Costing-Based CO-PA with the General Ledger notoriously difficult at month-end?',
+        targetConcept:
+          'Eliminates permanent reconciliation gaps between classic CO-PA and G/L accounting',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-margin-2',
+        probeText:
+          'How does S/4HANA split the Cost of Goods Sold (COGS) across multiple accounts at Goods Issue rather than waiting for invoice billing?',
+        targetConcept:
+          'Real-time Cost of Goods Sold (COGS) splitting across multiple G/L accounts at Goods Issue',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description: 'Does not know what CO-PA or Margin Analysis is.',
+        keyIndicators: [
+          'Confuses CO-PA with Cost Center Accounting',
+          'Unaware of Margin Analysis in S/4HANA',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Knows Margin Analysis is account-based, but cannot explain COGS splitting or variance category breakdowns.',
+        keyIndicators: [
+          'Knows Margin Analysis uses accounts instead of value fields',
+          'Vague on timing of COGS splitting at Goods Issue',
+          'Unclear on variance category mapping',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Clear understanding of ACDOCA unification, real-time COGS split, variance split, and elimination of reconciliation issues.',
+        keyIndicators: [
+          'Detailed explanation of COGS split configuration via cost component split',
+          'Production variance category accounts (input price, quantity, lot size)',
+          'Instant reconciliation with G/L balance sheets',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Advanced mastery: Predictive Accounting for sales orders, derivation of profitability characteristics via BAdIs, and integration with SAC (SAP Analytics Cloud).',
+        keyIndicators: [
+          'Predictive Accounting extension ledger entries on incoming Sales Orders',
+          'Derivation rules for custom profitability characteristics in ACDOCA',
+          'Real-time reporting in SAP Analytics Cloud (SAC) via CDS Consumption views',
         ],
       },
     ],

@@ -17,6 +17,7 @@ import {
   type InterviewReport,
   InterviewDifficulty,
   EvaluationRating,
+  ProfessionalDomain,
 } from '@interviewai/shared-types';
 
 /**
@@ -123,7 +124,11 @@ export class MockAiAdapter
     this.logger.debug(
       `[MockRealtime] Creating mock session for ${config.sessionId}`,
     );
-    return new MockRealtimeSession(config.sessionId);
+    const isSap =
+      config.systemInstruction?.toLowerCase().includes('sap') ||
+      config.systemInstruction?.toLowerCase().includes('clean core') ||
+      false;
+    return new MockRealtimeSession(config.sessionId, isSap);
   }
 
   // ── IEvaluationProvider implementation ───────────────────
@@ -133,14 +138,48 @@ export class MockAiAdapter
   ): Promise<InterviewReport> {
     this.logger.debug(`[MockEvaluation] Evaluating session ${input.sessionId}`);
 
+    const isSap = input.domain === ProfessionalDomain.SAP;
+
     const competencyScores = input.competencies.map((comp) => ({
       competencyId: comp.id,
       competencyName: comp.name,
       score: 3,
       rating: EvaluationRating.PROFICIENT,
-      justification: `Demonstrated clear understanding of core concepts in ${comp.name} during the session discussion.`,
+      justification: isSap
+        ? `Demonstrated solid architectural mastery of ${comp.name} adhering to enterprise Clean Core standards.`
+        : `Demonstrated clear understanding of core concepts in ${comp.name} during the session discussion.`,
       sufficientEvidence: true,
     }));
+
+    if (isSap) {
+      return {
+        id: `eval-${Date.now()}`,
+        sessionId: input.sessionId,
+        overallScore: 3.3,
+        overallRating: EvaluationRating.PROFICIENT,
+        summary: `Candidate demonstrated solid enterprise SAP architectural fundamentals and clean core discipline appropriate for ${input.targetRole} (${input.experienceLevel}). Accurately explained transactional buffers, Universal Journal integration, and extensibility boundaries.`,
+        competencyScores,
+        strengths: [
+          'Strong adherence to SAP Clean Core strategy avoiding classic core modifications',
+          'Sound understanding of S/4HANA Universal Journal (ACDOCA) and multi-ledger financial reconciliation',
+          'Accurate explanation of transactional boundaries, behavior definitions (BDEF), and SAP LUW save sequence',
+        ],
+        weaknesses: [
+          'Could provide deeper analysis of SAP Event Mesh broker federation and consumer backpressure',
+          'Opportunity to specify exact CDS access control (DCL) authorization aspects for analytical queries',
+        ],
+        incorrectStatements: [],
+        areasNotAssessed: [
+          'SAP BTP Private Link Service and hybrid VPN peering',
+        ],
+        recommendations: [
+          'Review SAP Cloud Integration (CPI) JMS transaction boundaries and dead-letter queue escalation',
+          'Practice configuring ABAP Test Cockpit (ATC) with Clean Core variant for automated code governance',
+        ],
+        suggestedNextDifficulty: InterviewDifficulty.HARD,
+        generatedAt: new Date().toISOString(),
+      };
+    }
 
     return {
       id: `eval-${Date.now()}`,
@@ -178,15 +217,28 @@ class MockRealtimeSession implements IRealtimeSession {
   private turnCount = 0;
   private lastTurnTimestamp = 0;
 
-  private readonly questions = [
-    'Could you walk me through your high-level architecture and how requests flow through the system?',
-    'Good. How do you handle cache invalidation and ensure strong data consistency under partition failures?',
-    'Interesting. How do you prevent race conditions when multiple concurrent nodes attempt to mutate the state?',
-    'How would you monitor and measure p99 latency spikes and handle circuit breaker fallbacks in production?',
-    'That was a thorough technical breakdown. Let us explore edge cases and how your service fails over under region outages.',
-  ];
+  private readonly questions: string[];
 
-  constructor(readonly sessionId: string) {
+  constructor(
+    readonly sessionId: string,
+    private readonly isSap = false,
+  ) {
+    this.questions = isSap
+      ? [
+          'Could you walk me through your high-level architecture and how your design aligns with SAP Clean Core principles?',
+          'Good. How does your solution ensure transactional integrity and SAP LUW consistency across the save sequence?',
+          'Interesting. How do you handle integration exceptions, idempotent receivers, and error escalation in this scenario?',
+          'How would you scale this design to handle high-volume postings in S/4HANA Universal Journal (ACDOCA) without locking bottlenecks?',
+          'That was a thorough architectural breakdown. How do you ensure this extension survives quarterly S/4HANA Cloud upgrades without regression?',
+        ]
+      : [
+          'Could you walk me through your high-level architecture and how requests flow through the system?',
+          'Good. How do you handle cache invalidation and ensure strong data consistency under partition failures?',
+          'Interesting. How do you prevent race conditions when multiple concurrent nodes attempt to mutate the state?',
+          'How would you monitor and measure p99 latency spikes and handle circuit breaker fallbacks in production?',
+          'That was a thorough technical breakdown. Let us explore edge cases and how your service fails over under region outages.',
+        ];
+
     // Emit session.ready after tick
     setTimeout(() => {
       this.emit({ type: 'session.ready', timestamp: Date.now() });
@@ -222,9 +274,13 @@ class MockRealtimeSession implements IRealtimeSession {
     const now = Date.now();
     this.lastTurnTimestamp = now;
 
+    const transcriptText = this.isSap
+      ? 'In our S/4HANA architecture, we enforce Clean Core Tier 2 developer extensibility with released C1 APIs, avoiding direct DB updates and letting the RAP transaction manager govern ACDOCA postings.'
+      : 'In our architecture, we use distributed token bucket rate limiting in Redis with write-through caching and master-replica failover to keep p99 latency low.';
+
     this.emit({
       type: 'candidate.transcript.final',
-      text: 'In our architecture, we use distributed token bucket rate limiting in Redis with write-through caching and master-replica failover to keep p99 latency low.',
+      text: transcriptText,
       timestamp: now,
     });
     this.emit({ type: 'candidate.speech.ended', timestamp: now });

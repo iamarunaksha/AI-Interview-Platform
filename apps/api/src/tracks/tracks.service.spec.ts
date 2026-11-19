@@ -160,5 +160,74 @@ describe('TracksService', () => {
       expect(plan.questions.length).toBeGreaterThan(0);
       expect(plan.questions[0].title).toBe('Rate Limiter');
     });
+
+    it('should plan an SAP Enterprise interview session with SAP competencies', async () => {
+      const sapCompetency: Competency = {
+        id: 'comp-sap-1',
+        domain: ProfessionalDomain.SAP,
+        name: 'SAP Clean Core & S/4HANA Architecture',
+        slug: 'sap_s4hana_core_clean_core',
+        category: 'Enterprise Architecture',
+        description: 'Universal Journal and Clean Core',
+        isActive: true,
+        questions: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const sapQuestion: Question = {
+        id: 'q-sap-1',
+        competencyId: 'comp-sap-1',
+        competency: sapCompetency,
+        domain: ProfessionalDomain.SAP,
+        companyCategories: [CompanyCategory.SAP_CONSULTING],
+        experienceLevels: [ExperienceLevel.SENIOR],
+        difficulty: InterviewDifficulty.HARD,
+        title: 'SAP Clean Core Extensibility Strategy',
+        stem: 'Explain the 3-tier extensibility model',
+        contextPrompt: 'Context',
+        expectedConcepts: [
+          'Tier 1 Key User',
+          'Tier 2 Embedded Steampunk',
+          'Tier 3 BTP',
+        ],
+        commonMisconceptions: ['Direct table modification'],
+        probingQuestions: [],
+        rubricGuide: [],
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      vi.mocked(mockCompetencyRepo.find!).mockResolvedValueOnce([
+        sapCompetency,
+      ]);
+      const mockQueryBuilder = {
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        getMany: vi.fn().mockResolvedValue([sapQuestion]),
+      };
+      vi.mocked(mockQuestionRepo.createQueryBuilder!).mockReturnValueOnce(
+        mockQueryBuilder as any,
+      );
+
+      const plan = await tracksService.planInterview({
+        domain: ProfessionalDomain.SAP,
+        companyCategory: CompanyCategory.SAP_CONSULTING,
+        targetRole: 'SAP S/4HANA Solution Architect',
+        experienceLevel: ExperienceLevel.SENIOR,
+        difficulty: InterviewDifficulty.HARD,
+        durationMinutes: 45,
+      });
+
+      expect(plan.sessionTrack.domain).toBe(ProfessionalDomain.SAP);
+      expect(plan.competencies).toHaveLength(1);
+      expect(plan.competencies[0].slug).toBe('sap_s4hana_core_clean_core');
+      expect(plan.questions).toHaveLength(1);
+      expect(plan.questions[0].title).toBe(
+        'SAP Clean Core Extensibility Strategy',
+      );
+    });
   });
 });

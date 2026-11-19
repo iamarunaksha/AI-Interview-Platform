@@ -34,53 +34,44 @@ export class TracksService implements OnModuleInit {
   }
 
   async ensureSeeded(): Promise<void> {
-    const competencyCount = await this.competencyRepo.count();
-    if (competencyCount === 0) {
-      console.log(
-        '🌱 Seeding initial technical competencies and question bank...',
-      );
+    const competencyMap = new Map<string, Competency>();
 
-      const competencyMap = new Map<string, Competency>();
+    for (const compData of INITIAL_COMPETENCIES) {
+      let competency = await this.competencyRepo.findOne({
+        where: { slug: compData.slug },
+      });
+      if (!competency) {
+        competency = this.competencyRepo.create(compData);
+        competency = await this.competencyRepo.save(competency);
+      }
+      competencyMap.set(compData.slug, competency);
+    }
 
-      for (const compData of INITIAL_COMPETENCIES) {
-        let competency = await this.competencyRepo.findOne({
-          where: { slug: compData.slug },
+    for (const qData of INITIAL_QUESTIONS) {
+      const competency = competencyMap.get(qData.competencySlug);
+      if (competency) {
+        const existing = await this.questionRepo.findOne({
+          where: { title: qData.title },
         });
-        if (!competency) {
-          competency = this.competencyRepo.create(compData);
-          competency = await this.competencyRepo.save(competency);
-        }
-        competencyMap.set(compData.slug, competency);
-      }
-
-      for (const qData of INITIAL_QUESTIONS) {
-        const competency = competencyMap.get(qData.competencySlug);
-        if (competency) {
-          const existing = await this.questionRepo.findOne({
-            where: { title: qData.title },
+        if (!existing) {
+          const question = this.questionRepo.create({
+            competencyId: competency.id,
+            domain: qData.domain,
+            companyCategories: qData.companyCategories,
+            experienceLevels: qData.experienceLevels,
+            difficulty: qData.difficulty,
+            title: qData.title,
+            stem: qData.stem,
+            contextPrompt: qData.contextPrompt,
+            expectedConcepts: qData.expectedConcepts,
+            commonMisconceptions: qData.commonMisconceptions,
+            probingQuestions: qData.probingQuestions,
+            rubricGuide: qData.rubricGuide,
+            isActive: true,
           });
-          if (!existing) {
-            const question = this.questionRepo.create({
-              competencyId: competency.id,
-              domain: qData.domain,
-              companyCategories: qData.companyCategories,
-              experienceLevels: qData.experienceLevels,
-              difficulty: qData.difficulty,
-              title: qData.title,
-              stem: qData.stem,
-              contextPrompt: qData.contextPrompt,
-              expectedConcepts: qData.expectedConcepts,
-              commonMisconceptions: qData.commonMisconceptions,
-              probingQuestions: qData.probingQuestions,
-              rubricGuide: qData.rubricGuide,
-              isActive: true,
-            });
-            await this.questionRepo.save(question);
-          }
+          await this.questionRepo.save(question);
         }
       }
-
-      console.log('✅ Technical question bank seeding completed successfully.');
     }
   }
 

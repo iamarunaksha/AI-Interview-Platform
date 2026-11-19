@@ -194,7 +194,7 @@ Analyze the response strictly. Output a valid JSON object with the following sch
       }
     }
 
-    // 4. Practical Experience Detection
+    // 4. Practical Experience Detection (SDE & SAP operational keywords)
     const practicalKeywords = [
       'production',
       'p99',
@@ -213,6 +213,26 @@ Analyze the response strictly. Output a valid JSON object with the following sch
       'memory leak',
       'deadlock',
       'throughput',
+      'clean core',
+      'acdoca',
+      'universal journal',
+      'fubr',
+      'iflow',
+      'bdef',
+      'determination',
+      'validation',
+      'embedded steampunk',
+      'btp',
+      'event mesh',
+      'cap',
+      'amdp',
+      'cds',
+      'document splitting',
+      'parallel ledger',
+      'cvi',
+      'but000',
+      'vsr',
+      'freight order',
     ];
     let practicalMatches = 0;
     for (const kw of practicalKeywords) {

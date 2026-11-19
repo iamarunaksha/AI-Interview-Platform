@@ -3,6 +3,7 @@ import {
   InterviewStage,
   InterviewMode,
   InterviewerPersonality,
+  ProfessionalDomain,
   type ProbingQuestion,
 } from '@interviewai/shared-types';
 import type { InterviewSessionEntity } from '../entities/interview-session.entity.js';
@@ -37,7 +38,22 @@ export class ContextInjectorService {
       activeCode,
     } = params;
 
-    const roleProfile = `You are a Principal Engineering Interviewer conducting a live adaptive interview for a ${session.experienceLevel} candidate targeting the role of "${session.targetRole}".`;
+    const isSap =
+      session.domain === ProfessionalDomain.SAP ||
+      question?.domain === ProfessionalDomain.SAP;
+
+    const roleProfile = isSap
+      ? `You are an SAP Enterprise Solutions Architect & Clean Core Lead conducting a rigorous technical interview for a ${session.experienceLevel} candidate targeting the enterprise role of "${session.targetRole}".`
+      : `You are a Principal Engineering Interviewer conducting a live adaptive interview for a ${session.experienceLevel} candidate targeting the role of "${session.targetRole}".`;
+
+    const sapDirective = isSap
+      ? `SAP Enterprise Architecture & Clean Core Evaluation Directives:
+1. Enforce SAP Clean Core Governance: Strongly penalize suggestions of classic core modifications, unreleased function modules, or direct database updates. Evaluate candidates against Key User Extensibility (Tier 1), Developer Extensibility / Embedded Steampunk via ABAP Cloud with released C1 APIs (Tier 2), and Side-by-Side BTP services (Tier 3).
+2. Transactional & LUW Integrity: Verify deep understanding of the SAP Logical Unit of Work. In ABAP RAP, ensure candidate understands why calling COMMIT WORK inside determinations/actions triggers runtime dump DYN_CALL_ILLEGAL_COMMIT, and that the RAP transaction manager handles the save sequence.
+3. Modern S/4HANA Architecture: Probe knowledge of the Universal Journal (ACDOCA) vs legacy BSEG, Business Partner (BUT000 / CVI) vs KNA1/LFA1, and CDS View code-to-data pushdown on SAP HANA.
+4. Cloud & Integration Standards: Enforce resilient integration patterns (CPI iFlows, Idempotent Receivers, SAP Event Mesh, Cloud Connector) over fragile point-to-point RFC connections.
+5. Probe on concrete SAP technical ground truth, released annotations (@UI, @Search), behavior definitions, and configuration principles.`
+      : '';
 
     const personalityDirective = this.getPersonalityDirective(
       session.personality,
@@ -48,6 +64,7 @@ export class ContextInjectorService {
       question,
       remainingConcepts,
       activeProbing,
+      isSap,
     );
 
     const codeContext =
@@ -73,6 +90,7 @@ Note: The candidate is actively editing this code in their coding environment. R
 
     return [
       roleProfile,
+      sapDirective,
       personalityDirective,
       modeDirective,
       stageDirective,
@@ -117,13 +135,18 @@ Note: The candidate is actively editing this code in their coding environment. R
     question: Question | null,
     remainingConcepts: string[],
     activeProbing?: ProbingQuestion | null,
+    isSap = false,
   ): string {
     switch (stage) {
       case InterviewStage.GREETING:
         return `Current Stage: GREETING & EXPECTATIONS SETTING.
 Your immediate task:
 - Warmly greet the candidate by welcoming them to their interview.
-- Briefly mention the format (e.g. "We will be diving into system design and architecture concepts today").
+- Briefly mention the format (e.g. ${
+          isSap
+            ? '"We will be exploring enterprise SAP architecture, Clean Core strategy, and module integration today"'
+            : '"We will be diving into system design and architecture concepts today"'
+        }).
 - Ask them if they are ready to begin.
 - DO NOT reveal or ask the technical problem yet!`;
 
@@ -152,6 +175,13 @@ Listen carefully to what they say, identify any superficial claims, and ask them
       }
 
       case InterviewStage.DEEP_DIVE:
+        if (isSap) {
+          return `Current Stage: DEEP DIVE & ENTERPRISE STRESS TESTING.
+Push the candidate's SAP architecture to its operational limits:
+- Ask about high-volume transactional throughput (millions of ACDOCA postings, batch iFlows, delta buffer locking).
+- Ask how their design handles rollbacks, exception subprocesses, and SAP LUW integrity without corrupting financial or logistics records.
+- Challenge them on Clean Core upgrade compliance when standard released APIs are unavailable.`;
+        }
         return `Current Stage: DEEP DIVE & EDGE CASE STRESS TESTING.
 Push the candidate's design to its limits:
 - Ask about high concurrency, race conditions, distributed locking, or network partitions.

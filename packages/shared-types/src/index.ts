@@ -712,3 +712,287 @@ export interface VideoSessionState {
   layoutMode: VideoLayoutMode;
   consentGranted: boolean;
 }
+
+// ---- SAP Interview Specialization Types (Phase 12) ----
+
+/**
+ * SAP Enterprise Modules & Functional/Technical Specializations
+ */
+export enum SapModuleSpecialization {
+  ABAP_RAP = "abap_rap",
+  S4HANA_CORE = "s4hana_core",
+  BTP_INTEGRATION = "btp_integration",
+  TM_LOGISTICS = "tm_logistics",
+  FICO_FINANCIALS = "fico_financials",
+}
+
+/**
+ * SAP Clean Core Extensibility Tiers
+ */
+export enum SapExtensibilityTier {
+  KEY_USER_IN_APP = "key_user_in_app", // Tier 1: Low-code / No-code in Fiori (Custom Fields & Logic)
+  DEVELOPER_EMBEDDED_STEAMPUNK = "developer_embedded_steampunk", // Tier 2: ABAP Cloud on S/4HANA (Released C1 APIs)
+  SIDE_BY_SIDE_BTP = "side_by_side_btp", // Tier 3: BTP CAP / RAP / Event Mesh
+  CLASSIC_CUSTOM_CODE = "classic_custom_code", // Legacy: Modifications, classic user exits, SE38 (Anti-pattern in Clean Core)
+}
+
+/**
+ * Metadata descriptor for an SAP specialization module
+ */
+export interface SapModuleDescriptor {
+  id: SapModuleSpecialization;
+  name: string;
+  shortCode: string;
+  category: "Technical" | "Functional" | "Architectural";
+  competencySlug: string;
+  description: string;
+  keyArchitectures: string[];
+  cleanCorePrinciples: string[];
+  targetRoles: string[];
+}
+
+/**
+ * Pre-configured SAP Track Role definitions
+ */
+export interface SapTrackRoleDefinition {
+  title: string;
+  slug: string;
+  module: SapModuleSpecialization;
+  defaultDifficulty: InterviewDifficulty;
+  experienceLevels: ExperienceLevel[];
+  keyCompetencies: string[];
+  focusAreas: string[];
+}
+
+export const SAP_MODULE_DESCRIPTORS: Record<
+  SapModuleSpecialization,
+  SapModuleDescriptor
+> = {
+  [SapModuleSpecialization.ABAP_RAP]: {
+    id: SapModuleSpecialization.ABAP_RAP,
+    name: "ABAP RESTful Application Programming Model (RAP) & CDS",
+    shortCode: "RAP / CDS",
+    category: "Technical",
+    competencySlug: "sap_abap_rap",
+    description:
+      "Core Data Services (CDS), Behavior Definitions, Determinations, Validations, Actions, Early Numbering, Draft handling, and Code-to-Data pushdown.",
+    keyArchitectures: [
+      "Behavior Definition (BDEF)",
+      "Virtual Data Model (VDM)",
+      "Draft Buffer",
+      "AMDP",
+      "OData V4",
+    ],
+    cleanCorePrinciples: [
+      "Strict ABAP Cloud syntax",
+      "No direct DB updates or classic COMMIT WORK in save sequence",
+      "Released C1 APIs",
+    ],
+    targetRoles: [
+      "SAP ABAP Cloud Developer",
+      "SAP RAP / CAP Engineer",
+      "SAP Fiori / Full-Stack Developer",
+    ],
+  },
+  [SapModuleSpecialization.S4HANA_CORE]: {
+    id: SapModuleSpecialization.S4HANA_CORE,
+    name: "S/4HANA Enterprise Core & Clean Core Architecture",
+    shortCode: "S/4 Clean Core",
+    category: "Architectural",
+    competencySlug: "sap_s4hana_core_clean_core",
+    description:
+      "Universal Journal ACDOCA, Business Partner (BUT000 / CVI), In-App vs Side-by-Side Extensibility, 3-tier Clean Core strategy, and Simplification List.",
+    keyArchitectures: [
+      "Universal Journal (ACDOCA)",
+      "Business Partner (CVI)",
+      "Embedded Steampunk",
+      "Side-by-Side BTP",
+      "Released CDS Views",
+    ],
+    cleanCorePrinciples: [
+      "Zero modifications to core SAP standard",
+      "Upgrade stability without regression",
+      "Decoupled extensions via public events and APIs",
+    ],
+    targetRoles: [
+      "SAP S/4HANA Solution Architect",
+      "SAP Technical Lead",
+      "SAP Clean Core Strategist",
+    ],
+  },
+  [SapModuleSpecialization.BTP_INTEGRATION]: {
+    id: SapModuleSpecialization.BTP_INTEGRATION,
+    name: "SAP BTP, Integration Suite & Cloud Architecture",
+    shortCode: "BTP / CPI",
+    category: "Technical",
+    competencySlug: "sap_btp_cloud_integration",
+    description:
+      "Cloud Integration (CPI) iFlows, Exception Subprocesses, Idempotent Receivers, SAP Event Mesh, Cloud Application Programming (CAP), and Destination Services.",
+    keyArchitectures: [
+      "Cloud Integration (CPI)",
+      "SAP Event Mesh / EDA",
+      "SAP CAP Framework",
+      "Cloud Connector",
+      "API Management",
+    ],
+    cleanCorePrinciples: [
+      "Asynchronous event-driven decoupling",
+      "Zero point-to-point hardcoding",
+      "Idempotent enterprise messaging",
+    ],
+    targetRoles: [
+      "SAP BTP Integration Consultant",
+      "SAP Cloud Architect",
+      "SAP Middleware Specialist",
+    ],
+  },
+  [SapModuleSpecialization.TM_LOGISTICS]: {
+    id: SapModuleSpecialization.TM_LOGISTICS,
+    name: "SAP Transportation Management (TM) & Supply Chain Logistics",
+    shortCode: "TM Logistics",
+    category: "Functional",
+    competencySlug: "sap_tm_logistics",
+    description:
+      "Freight Unit Building Rules (FUBR), Transportation Cockpit optimization, Incompatibility Rules, Freight Orders, Carrier selection, and ERP/EWM integration.",
+    keyArchitectures: [
+      "Freight Unit Building Rules (FUBR)",
+      "Transportation Cockpit / VSR Optimizer",
+      "Freight Order (FO)",
+      "Charge Management (TCM)",
+      "EWM Integration",
+    ],
+    cleanCorePrinciples: [
+      "Standard TM condition techniques",
+      "BAdI enhancement spots without core modifications",
+      "Standard Enterprise Services / OData",
+    ],
+    targetRoles: [
+      "SAP TM Functional Consultant",
+      "SAP Supply Chain Logistics Architect",
+      "SAP TM/EWM Integration Lead",
+    ],
+  },
+  [SapModuleSpecialization.FICO_FINANCIALS]: {
+    id: SapModuleSpecialization.FICO_FINANCIALS,
+    name: "SAP S/4HANA Finance (FICO) & Financial Architecture",
+    shortCode: "S/4 FICO",
+    category: "Functional",
+    competencySlug: "sap_fico_financials",
+    description:
+      "Universal Journal ACDOCA table architecture, Parallel Ledgers, Fast Close, Document Splitting, Margin Analysis (Account-based CO-PA), and Real-time Reconciliation.",
+    keyArchitectures: [
+      "Universal Journal (ACDOCA)",
+      "Leading & Non-Leading Ledgers",
+      "Document Splitting",
+      "Margin Analysis (CO-PA)",
+      "Central Finance (CFIN)",
+    ],
+    cleanCorePrinciples: [
+      "Single source of truth in ACDOCA",
+      "Automated real-time reconciliation",
+      "Standard S/4HANA Financial APIs",
+    ],
+    targetRoles: [
+      "SAP FICO Consultant",
+      "SAP Financial Solutions Architect",
+      "SAP S/4HANA Finance Lead",
+    ],
+  },
+};
+
+export const SAP_TRACK_ROLES: SapTrackRoleDefinition[] = [
+  {
+    title: "SAP ABAP Cloud / RAP Developer",
+    slug: "sap-abap-cloud-developer",
+    module: SapModuleSpecialization.ABAP_RAP,
+    defaultDifficulty: InterviewDifficulty.MEDIUM,
+    experienceLevels: [
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+      ExperienceLevel.STAFF,
+    ],
+    keyCompetencies: ["sap_abap_rap", "sap_s4hana_core_clean_core"],
+    focusAreas: [
+      "ABAP RAP",
+      "Core Data Services (CDS)",
+      "Behavior Definitions",
+      "Code-to-Data pushdown",
+      "ABAP Cloud syntax",
+    ],
+  },
+  {
+    title: "SAP S/4HANA Solution Architect",
+    slug: "sap-s4hana-solution-architect",
+    module: SapModuleSpecialization.S4HANA_CORE,
+    defaultDifficulty: InterviewDifficulty.HARD,
+    experienceLevels: [ExperienceLevel.SENIOR, ExperienceLevel.STAFF],
+    keyCompetencies: [
+      "sap_s4hana_core_clean_core",
+      "sap_abap_rap",
+      "sap_btp_cloud_integration",
+    ],
+    focusAreas: [
+      "Clean Core strategy",
+      "In-App vs Side-by-Side extensibility",
+      "Universal Journal ACDOCA",
+      "Business Partner migration",
+      "Simplification List",
+    ],
+  },
+  {
+    title: "SAP BTP Integration Consultant",
+    slug: "sap-btp-integration-consultant",
+    module: SapModuleSpecialization.BTP_INTEGRATION,
+    defaultDifficulty: InterviewDifficulty.MEDIUM,
+    experienceLevels: [
+      ExperienceLevel.SDE_1,
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+    ],
+    keyCompetencies: [
+      "sap_btp_cloud_integration",
+      "sap_s4hana_core_clean_core",
+    ],
+    focusAreas: [
+      "Cloud Integration (CPI) iFlows",
+      "Exception handling",
+      "SAP Event Mesh",
+      "Cloud Application Programming (CAP)",
+      "Cloud Connector",
+    ],
+  },
+  {
+    title: "SAP TM Functional Architect",
+    slug: "sap-tm-functional-architect",
+    module: SapModuleSpecialization.TM_LOGISTICS,
+    defaultDifficulty: InterviewDifficulty.MEDIUM,
+    experienceLevels: [
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+      ExperienceLevel.STAFF,
+    ],
+    keyCompetencies: ["sap_tm_logistics", "sap_s4hana_core_clean_core"],
+    focusAreas: [
+      "Freight Unit Building Rules (FUBR)",
+      "Transportation Cockpit VSR",
+      "Incompatibility Rules",
+      "Charge calculation",
+      "EWM integration",
+    ],
+  },
+  {
+    title: "SAP S/4HANA Finance (FICO) Lead",
+    slug: "sap-s4hana-fico-lead",
+    module: SapModuleSpecialization.FICO_FINANCIALS,
+    defaultDifficulty: InterviewDifficulty.HARD,
+    experienceLevels: [ExperienceLevel.SENIOR, ExperienceLevel.STAFF],
+    keyCompetencies: ["sap_fico_financials", "sap_s4hana_core_clean_core"],
+    focusAreas: [
+      "Universal Journal (ACDOCA)",
+      "Parallel Ledgers & Multi-GAAP",
+      "Document Splitting",
+      "Margin Analysis",
+      "Fast Close",
+    ],
+  },
+];
