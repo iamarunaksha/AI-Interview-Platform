@@ -1,4 +1,12 @@
-import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Patch,
+  Body,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { CandidatesService } from './candidates.service.js';
 import { UpdateCandidateProfileDto } from './dto/update-candidate-profile.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
@@ -30,10 +38,21 @@ export class CandidatesController {
   }
 
   /**
-   * Update the candidate's profile and onboarding preferences.
+   * Update the candidate's profile and onboarding preferences (PUT).
    */
   @Put('profile')
   async updateProfile(
+    @Req() req: { user: UserProfile },
+    @Body() dto: UpdateCandidateProfileDto,
+  ): Promise<CandidateProfileResponse> {
+    return this.candidatesService.updateProfile(req.user.id, dto);
+  }
+
+  /**
+   * Partially update candidate profile and onboarding preferences (PATCH).
+   */
+  @Patch('profile')
+  async patchProfile(
     @Req() req: { user: UserProfile },
     @Body() dto: UpdateCandidateProfileDto,
   ): Promise<CandidateProfileResponse> {

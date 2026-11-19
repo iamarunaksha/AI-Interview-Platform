@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -13,6 +14,7 @@ import { EvidenceModule } from './evidence/evidence.module.js';
 import { EvaluationModule } from './evaluation/evaluation.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { CodingModule } from './coding/coding.module.js';
+import { RateLimitGuard } from './common/guards/rate-limit.guard.js';
 
 @Module({
   imports: [
@@ -33,6 +35,12 @@ import { CodingModule } from './coding/coding.module.js';
     CodingModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
+  ],
 })
 export class AppModule {}

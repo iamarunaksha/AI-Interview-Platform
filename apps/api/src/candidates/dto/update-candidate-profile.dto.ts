@@ -6,6 +6,7 @@ import {
   Min,
   Max,
   IsObject,
+  IsBoolean,
   MaxLength,
 } from 'class-validator';
 import {
@@ -76,4 +77,8 @@ export class UpdateCandidateProfileDto {
   @IsOptional()
   @IsObject()
   preferences?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsBoolean()
+  isOnboarded?: boolean;
 }

@@ -10,6 +10,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CodingService } from './coding.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RateLimit } from '../common/decorators/rate-limit.decorator.js';
 import type {
   CodingProblem,
   CodeExecutionResult,
@@ -38,6 +39,7 @@ export class CodingController {
   }
 
   @Post('execute')
+  @RateLimit({ ttlSeconds: 60, limit: 20 })
   @ApiOperation({
     summary:
       'Execute candidate code in the isolated sandbox against test suites',

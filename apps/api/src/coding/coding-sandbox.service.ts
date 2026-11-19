@@ -33,6 +33,21 @@ export class CodingSandboxService {
       `Executing ${language} code against ${testCases.length} test cases (Entry: ${entryFunction || 'auto'})`,
     );
 
+    const securityError = this.validateCodeSafety(code, language);
+    if (securityError) {
+      this.logger.warn(`Sandbox security check failed: ${securityError}`);
+      return {
+        language,
+        status: CodeExecutionStatus.COMPILE_ERROR,
+        totalTests: testCases.length,
+        passedTests: 0,
+        runtimeMs: 0,
+        results: [],
+        compilerOutput: securityError,
+        interviewerContextNote: `Candidate attempted prohibited sandbox execution: ${securityError}`,
+      };
+    }
+
     const startTime = Date.now();
 
     switch (language) {
@@ -440,5 +455,68 @@ print(json.dumps({"results": results, "passedCount": passed_count}))
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Static security validator to prevent sandbox escapement, prototype pollution,
+   * host environment inspection, and unauthorized module loading.
+   */
+  private validateCodeSafety(
+    code: string,
+    language: ProgrammingLanguage,
+  ): string | null {
+    if (
+      language === ProgrammingLanguage.JAVASCRIPT ||
+      language === ProgrammingLanguage.TYPESCRIPT
+    ) {
+      const prohibitedPatterns: Array<{
+        pattern: RegExp;
+        description: string;
+      }> = [
+        { pattern: /\bprocess\b/, description: 'Node.js host process' },
+        { pattern: /\bchild_process\b/, description: 'child_process module' },
+        { pattern: /\b__proto__\b/, description: 'prototype pollution' },
+        {
+          pattern: /\bconstructor\s*\.\s*constructor\b/,
+          description: 'Function constructor escapement',
+        },
+        { pattern: /\brequire\s*\(/, description: 'dynamic module require' },
+        { pattern: /\bimport\s*\(/, description: 'dynamic import()' },
+        { pattern: /\bmainModule\b/, description: 'mainModule access' },
+        { pattern: /\bbinding\s*\(/, description: 'process.binding access' },
+        { pattern: /\bexecSync\b/, description: 'synchronous execution' },
+        { pattern: /\bspawnSync\b/, description: 'process spawning' },
+      ];
+
+      for (const { pattern, description } of prohibitedPatterns) {
+        if (pattern.test(code)) {
+          return `Security violation: Prohibited runtime construct detected (${description}). Host access is strictly blocked.`;
+        }
+      }
+    } else if (language === ProgrammingLanguage.PYTHON) {
+      const prohibitedPythonPatterns: Array<{
+        pattern: RegExp;
+        description: string;
+      }> = [
+        { pattern: /\bos\s*\.\s*system\b/, description: 'os.system execution' },
+        { pattern: /\bsubprocess\b/, description: 'subprocess module' },
+        { pattern: /\b__import__\b/, description: 'dynamic __import__' },
+        { pattern: /\beval\s*\(/, description: 'eval()' },
+        { pattern: /\bexec\s*\(/, description: 'exec()' },
+        { pattern: /\bopen\s*\(/, description: 'host file I/O' },
+        { pattern: /\bshutil\b/, description: 'shutil filesystem operations' },
+        {
+          pattern: /\bsys\s*\.\s*modules\b/,
+          description: 'sys.modules inspection',
+        },
+      ];
+
+      for (const { pattern, description } of prohibitedPythonPatterns) {
+        if (pattern.test(code)) {
+          return `Security violation: Prohibited Python operation detected (${description}). Host access is strictly blocked.`;
+        }
+      }
+    }
+    return null;
   }
 }

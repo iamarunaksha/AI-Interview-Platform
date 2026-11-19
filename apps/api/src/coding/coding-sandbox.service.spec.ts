@@ -123,23 +123,63 @@ describe('CodingSandboxService', () => {
     expect(result.results[0].error).toContain('timed out');
   });
 
-  it('should prevent access to restricted node APIs in sandbox', async () => {
-    const restrictedCode = `
+  it('should immediately block hostile code attempting to access process or host APIs', async () => {
+    const hostileCode = `
       function twoSum(nums, target) {
-        if (typeof process !== 'undefined') throw new Error('Security Breach: process is accessible');
-        if (typeof require !== 'undefined') throw new Error('Security Breach: require is accessible');
+        process.exit(1);
         return [0, 1];
       }
     `;
 
     const result = await sandbox.execute({
-      code: restrictedCode,
+      code: hostileCode,
       language: ProgrammingLanguage.TYPESCRIPT,
       testCases: [sampleTestCases[0]],
       entryFunction: 'twoSum',
     });
 
-    expect(result.status).toBe(CodeExecutionStatus.PASSED);
-    expect(result.results[0].passed).toBe(true);
+    expect(result.status).toBe(CodeExecutionStatus.COMPILE_ERROR);
+    expect(result.compilerOutput).toContain('Security violation');
+    expect(result.compilerOutput).toContain('Node.js host process');
+  });
+
+  it('should block prototype pollution and constructor escapement attempts', async () => {
+    const exploitCode = `
+      function twoSum(nums, target) {
+        const fn = this.constructor.constructor("return 42");
+        return [0, 1];
+      }
+    `;
+
+    const result = await sandbox.execute({
+      code: exploitCode,
+      language: ProgrammingLanguage.TYPESCRIPT,
+      testCases: [sampleTestCases[0]],
+      entryFunction: 'twoSum',
+    });
+
+    expect(result.status).toBe(CodeExecutionStatus.COMPILE_ERROR);
+    expect(result.compilerOutput).toContain('Security violation');
+    expect(result.compilerOutput).toContain('Function constructor escapement');
+  });
+
+  it('should block unauthorized file I/O or subprocess attempts in Python', async () => {
+    const hostilePython = `
+def two_sum(nums, target):
+    import subprocess
+    subprocess.run(["ls"])
+    return [0, 1]
+    `;
+
+    const result = await sandbox.execute({
+      code: hostilePython,
+      language: ProgrammingLanguage.PYTHON,
+      testCases: [sampleTestCases[0]],
+      entryFunction: 'two_sum',
+    });
+
+    expect(result.status).toBe(CodeExecutionStatus.COMPILE_ERROR);
+    expect(result.compilerOutput).toContain('Security violation');
+    expect(result.compilerOutput).toContain('subprocess module');
   });
 });

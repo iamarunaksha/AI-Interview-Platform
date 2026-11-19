@@ -13,6 +13,7 @@ import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { LocalAuthGuard } from './guards/local-auth.guard.js';
+import { RateLimit } from '../common/decorators/rate-limit.decorator.js';
 import type { AuthResponse, UserProfile } from '@interviewai/shared-types';
 
 /**
@@ -38,6 +39,7 @@ export class AuthController {
    * NestJS returns 400 with error details.
    */
   @Post('register')
+  @RateLimit({ ttlSeconds: 60, limit: 15 })
   async register(@Body() dto: RegisterDto): Promise<AuthResponse> {
     return this.authService.register(dto.email, dto.password, dto.name);
   }
@@ -55,6 +57,7 @@ export class AuthController {
    * Login doesn't create a resource, so 200 is more appropriate.
    */
   @Post('login')
+  @RateLimit({ ttlSeconds: 60, limit: 15 })
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   async login(

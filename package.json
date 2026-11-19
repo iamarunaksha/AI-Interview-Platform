@@ -12,6 +12,8 @@
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
+    "test:stress": "node scripts/stress-test-websockets.mjs",
+    "test:e2e:all": "node scripts/run-all-e2e.mjs",
     "seed:sap": "node scripts/seed-sap-knowledge.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
