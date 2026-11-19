@@ -7,6 +7,8 @@ interface InterviewControlsProps {
   isSpeakerMuted: boolean;
   isAssistantSpeaking: boolean;
   isPaused: boolean;
+  selectedAccent?: string;
+  onChangeAccent?: (accent: string) => void;
   onToggleMic: () => void;
   onToggleSpeaker: () => void;
   onInterrupt: () => void;
@@ -19,6 +21,8 @@ export function InterviewControls({
   isSpeakerMuted,
   isAssistantSpeaking,
   isPaused,
+  selectedAccent = "en-IN",
+  onChangeAccent,
   onToggleMic,
   onToggleSpeaker,
   onInterrupt,
@@ -132,6 +136,29 @@ export function InterviewControls({
           >
             {isPaused ? "Resume Interview" : "Pause"}
           </button>
+
+          {/* Accent Calibration Selector */}
+          <div className="flex items-center gap-1.5 bg-zinc-800/80 border border-zinc-700 rounded-xl px-2.5 py-1.5 text-xs">
+            <span className="text-zinc-400 text-[11px] hidden sm:inline">
+              Accent:
+            </span>
+            <select
+              value={selectedAccent}
+              onChange={(e) => onChangeAccent?.(e.target.value)}
+              className="bg-transparent text-zinc-200 text-xs font-medium focus:outline-none cursor-pointer"
+              title="Calibrate speech recognition for your accent"
+            >
+              <option value="en-IN" className="bg-zinc-900 text-zinc-100">
+                🇮🇳 Indian (en-IN)
+              </option>
+              <option value="en-US" className="bg-zinc-900 text-zinc-100">
+                🇺🇸 US (en-US)
+              </option>
+              <option value="en-GB" className="bg-zinc-900 text-zinc-100">
+                🇬🇧 UK (en-GB)
+              </option>
+            </select>
+          </div>
         </div>
 
         {/* Right utility buttons */}

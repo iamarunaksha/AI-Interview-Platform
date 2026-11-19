@@ -3,6 +3,7 @@
  *
  * Captures live spoken audio from the microphone using Web Speech API (webkitSpeechRecognition)
  * and streams real-time interim and final transcripts without requiring external API keys.
+ * Calibrated for high-fidelity technical vocabulary and Indian English ("en-IN").
  */
 
 export interface SpeechRecognitionCallbacks {
@@ -11,6 +12,52 @@ export interface SpeechRecognitionCallbacks {
   onError?: (error: string) => void;
   onStart?: () => void;
   onEnd?: () => void;
+}
+
+export type SpeechAccentLocale = "en-IN" | "en-US" | "en-GB";
+
+/**
+ * Phonetic normalizer for technical interview vocabulary.
+ * Corrects common STT misinterpretations of developer terms across accents (particularly Indian English).
+ */
+export function normalizeTechnicalSpeech(raw: string): string {
+  if (!raw) return "";
+
+  let cleaned = raw;
+
+  const replacements: Array<[RegExp, string]> = [
+    // Phrasing idioms
+    [/\b(we can|i am ready we can|let us|let's) diving\b/gi, "$1 dive in"],
+    [/\bwe can diving\b/gi, "we can dive in"],
+    [/\blet diving\b/gi, "let's dive in"],
+    [/\bdiving in\b/gi, "dive in"],
+
+    // Data structures & algorithms
+    [/\b(to sum|too sum)\b/gi, "Two Sum"],
+    [/\b(rash map|as map|has map)\b/gi, "hash map"],
+    [/\b(link list|linkedlist)\b/gi, "linked list"],
+    [/\bdoubly link list\b/gi, "doubly linked list"],
+    [/\b(dummy note|dummy mode)\b/gi, "dummy node"],
+    [/\bsentinel (note|mode)\b/gi, "sentinel node"],
+    [/\b(big of|big o)\s*(\d+|n|one)\b/gi, "O($2)"],
+    [/\b(order of one|o of one|o one)\b/gi, "O(1)"],
+    [/\b(order of n|o of n|o n)\b/gi, "O(N)"],
+    [/\b(o of log n|order of log n)\b/gi, "O(log N)"],
+    [/\b(o of n square|order of n square)\b/gi, "O(N²)"],
+    [/\bl r u\b/gi, "LRU"],
+    [/\bb plus tree\b/gi, "B+ Tree"],
+    [/\bb tree\b/gi, "B-Tree"],
+    [/\b(d s a)\b/gi, "DSA"],
+    [/\b(b s t)\b/gi, "BST"],
+    [/\b(b f s)\b/gi, "BFS"],
+    [/\b(d f s)\b/gi, "DFS"],
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    cleaned = cleaned.replace(pattern, replacement);
+  }
+
+  return cleaned;
 }
 
 interface SpeechRecognitionResultItem {
@@ -55,10 +102,37 @@ export class SpeechRecognitionPipeline {
   private finalTranscriptBuffer = "";
   private silenceTimer: NodeJS.Timeout | null = null;
   private isMuted = false;
+  private currentLang: SpeechAccentLocale = "en-IN";
 
-  constructor(callbacks: SpeechRecognitionCallbacks = {}) {
+  constructor(
+    callbacks: SpeechRecognitionCallbacks = {},
+    initialLang: SpeechAccentLocale = "en-IN",
+  ) {
     this.callbacks = callbacks;
+    this.currentLang = initialLang;
     this.initRecognition();
+  }
+
+  /**
+   * Set acoustic language / accent calibration at runtime.
+   */
+  setLanguage(lang: SpeechAccentLocale): void {
+    if (this.currentLang === lang) return;
+    this.currentLang = lang;
+    if (this.recognition) {
+      this.recognition.lang = lang;
+      if (this.isListening) {
+        try {
+          this.recognition.stop();
+        } catch {
+          // Restarted automatically on onend
+        }
+      }
+    }
+  }
+
+  getLanguage(): SpeechAccentLocale {
+    return this.currentLang;
   }
 
   private initRecognition(): void {
@@ -82,8 +156,9 @@ export class SpeechRecognitionPipeline {
       this.recognition = new SpeechRecognitionClass();
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
-      this.recognition.lang = "en-US";
-      this.recognition.maxAlternatives = 1;
+      // Default to Indian English ("en-IN") for sub-continental phonetic calibration
+      this.recognition.lang = this.currentLang;
+      this.recognition.maxAlternatives = 3;
 
       this.recognition.onstart = () => {
         this.isListening = true;
@@ -112,7 +187,9 @@ export class SpeechRecognitionPipeline {
             " " +
             interim.trim()
           ).trim();
-          this.callbacks.onInterimTranscript?.(combined);
+          this.callbacks.onInterimTranscript?.(
+            normalizeTechnicalSpeech(combined),
+          );
         }
 
         if (finalSegment.trim()) {
@@ -121,13 +198,16 @@ export class SpeechRecognitionPipeline {
             " " +
             finalSegment.trim()
           ).trim();
-          this.callbacks.onInterimTranscript?.(this.finalTranscriptBuffer);
+          const normalized = normalizeTechnicalSpeech(
+            this.finalTranscriptBuffer,
+          );
+          this.callbacks.onInterimTranscript?.(normalized);
 
-          // Reset silence timer: when user pauses for 1200ms after final segment, deliver turn
+          // Reset silence timer: when candidate pauses for 1500ms after final segment, deliver turn
           if (this.silenceTimer) clearTimeout(this.silenceTimer);
           this.silenceTimer = setTimeout(() => {
             this.flushFinalTranscript();
-          }, 1200);
+          }, 1500);
         }
       };
 
@@ -207,10 +287,11 @@ export class SpeechRecognitionPipeline {
   }
 
   private flushFinalTranscript(): void {
-    const text = this.finalTranscriptBuffer.trim();
-    if (text.length > 0) {
+    const raw = this.finalTranscriptBuffer.trim();
+    if (raw.length > 0) {
+      const normalized = normalizeTechnicalSpeech(raw);
       this.finalTranscriptBuffer = "";
-      this.callbacks.onFinalTranscript?.(text);
+      this.callbacks.onFinalTranscript?.(normalized);
       this.callbacks.onInterimTranscript?.("");
     }
   }

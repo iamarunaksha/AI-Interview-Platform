@@ -7,7 +7,10 @@ import { api } from "@/lib/api-client";
 import { interviewSocket } from "@/lib/socket-client";
 import { AudioRecorderPipeline } from "@/lib/audio-recorder";
 import { audioPlayer } from "@/lib/audio-player";
-import { SpeechRecognitionPipeline } from "@/lib/speech-recognition";
+import {
+  SpeechRecognitionPipeline,
+  type SpeechAccentLocale,
+} from "@/lib/speech-recognition";
 import { InterviewHeader } from "@/components/interview/interview-header";
 import { InterviewStageProgress } from "@/components/interview/interview-stage-progress";
 import { InterviewConceptTracker } from "@/components/interview/interview-concept-tracker";
@@ -87,6 +90,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const isAssistantSpeakingRef = useRef(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [accentLocale, setAccentLocale] = useState<SpeechAccentLocale>("en-IN");
 
   // Refs for recorders to avoid stale closures
   const recorderRef = useRef<AudioRecorderPipeline | null>(null);
@@ -171,7 +175,17 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
       case "interview.status":
         setIsPaused(event.status === InterviewStatus.PAUSED);
-        setSession((prev) => (prev ? { ...prev, status: event.status } : null));
+        setSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: event.status,
+                startedAt: event.startedAt
+                  ? String(event.startedAt)
+                  : prev.startedAt || new Date().toISOString(),
+              }
+            : null,
+        );
         break;
 
       case "orchestrator.state":
@@ -238,27 +252,36 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
     api.interviews
       .get(sessionId)
-      .then((data) => {
-        if (active) {
-          setSession(data);
-          setTranscript(data.transcript || []);
-          setIsPaused(data.status === InterviewStatus.PAUSED);
-          setLoading(false);
-          // Fetch existing evidence records
-          api.interviews
-            .getEvidence(sessionId)
-            .then((evs) => {
-              if (active) setEvidence(evs);
-            })
-            .catch(() => {});
-          // Fetch existing evaluation report
-          api.interviews
-            .getEvaluation(sessionId)
-            .then((rep) => {
-              if (active && rep) setEvaluationReport(rep);
-            })
-            .catch(() => {});
+      .then(async (data) => {
+        if (!active) return;
+        let sessionData = data;
+        // If session was freshly created, transition to IN_PROGRESS so timer & stage start ticking
+        if (data.status === InterviewStatus.CREATED) {
+          try {
+            const started = await api.interviews.start(sessionId);
+            sessionData = started;
+          } catch {
+            // Keep original data if transition was handled by gateway
+          }
         }
+        setSession(sessionData);
+        setTranscript(sessionData.transcript || []);
+        setIsPaused(sessionData.status === InterviewStatus.PAUSED);
+        setLoading(false);
+        // Fetch existing evidence records
+        api.interviews
+          .getEvidence(sessionId)
+          .then((evs) => {
+            if (active) setEvidence(evs);
+          })
+          .catch(() => {});
+        // Fetch existing evaluation report
+        api.interviews
+          .getEvaluation(sessionId)
+          .then((rep) => {
+            if (active && rep) setEvaluationReport(rep);
+          })
+          .catch(() => {});
       })
       .catch((err) => {
         if (active) {
@@ -312,21 +335,24 @@ export default function InterviewRoomPage({ params }: PageProps) {
     });
     recorderRef.current = recorder;
 
-    // Instantiate native speech recognizer for transcribing candidate's actual voice
-    const recognizer = new SpeechRecognitionPipeline({
-      onInterimTranscript: (text) => {
-        setInterimCandidateSpeech(text);
+    // Instantiate native speech recognizer for transcribing candidate's actual voice (calibrated to chosen accent)
+    const recognizer = new SpeechRecognitionPipeline(
+      {
+        onInterimTranscript: (text) => {
+          setInterimCandidateSpeech(text);
+        },
+        onFinalTranscript: (text) => {
+          setInterimCandidateSpeech(null);
+          if (text.trim()) {
+            handleSendText(text.trim());
+          }
+        },
+        onError: (err) => {
+          console.warn("Speech recognition notice:", err);
+        },
       },
-      onFinalTranscript: (text) => {
-        setInterimCandidateSpeech(null);
-        if (text.trim()) {
-          handleSendText(text.trim());
-        }
-      },
-      onError: (err) => {
-        console.warn("Speech recognition notice:", err);
-      },
-    });
+      accentLocale,
+    );
     speechRecognizerRef.current = recognizer;
 
     // Connect to WebSocket gateway
@@ -380,6 +406,11 @@ export default function InterviewRoomPage({ params }: PageProps) {
     // Only connect when sessionId or initial presence of session is ready; avoid bouncing socket on status updates
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, Boolean(session), handleSocketEvent]);
+
+  // Synchronize runtime accent calibration with active speech recognizer
+  useEffect(() => {
+    speechRecognizerRef.current?.setLanguage(accentLocale);
+  }, [accentLocale]);
 
   const handleToggleMic = async () => {
     if (!recorderRef.current) return;
@@ -705,6 +736,10 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 isSpeakerMuted={isSpeakerMuted}
                 isAssistantSpeaking={isAssistantSpeaking}
                 isPaused={isPaused}
+                selectedAccent={accentLocale}
+                onChangeAccent={(acc) =>
+                  setAccentLocale(acc as SpeechAccentLocale)
+                }
                 onToggleMic={handleToggleMic}
                 onToggleSpeaker={handleToggleSpeaker}
                 onInterrupt={handleInterrupt}
@@ -782,6 +817,10 @@ export default function InterviewRoomPage({ params }: PageProps) {
                   isSpeakerMuted={isSpeakerMuted}
                   isAssistantSpeaking={isAssistantSpeaking}
                   isPaused={isPaused}
+                  selectedAccent={accentLocale}
+                  onChangeAccent={(acc) =>
+                    setAccentLocale(acc as SpeechAccentLocale)
+                  }
                   onToggleMic={handleToggleMic}
                   onToggleSpeaker={handleToggleSpeaker}
                   onInterrupt={handleInterrupt}
@@ -819,6 +858,10 @@ export default function InterviewRoomPage({ params }: PageProps) {
                   isSpeakerMuted={isSpeakerMuted}
                   isAssistantSpeaking={isAssistantSpeaking}
                   isPaused={isPaused}
+                  selectedAccent={accentLocale}
+                  onChangeAccent={(acc) =>
+                    setAccentLocale(acc as SpeechAccentLocale)
+                  }
                   onToggleMic={handleToggleMic}
                   onToggleSpeaker={handleToggleSpeaker}
                   onInterrupt={handleInterrupt}
@@ -880,6 +923,10 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 isSpeakerMuted={isSpeakerMuted}
                 isAssistantSpeaking={isAssistantSpeaking}
                 isPaused={isPaused}
+                selectedAccent={accentLocale}
+                onChangeAccent={(acc) =>
+                  setAccentLocale(acc as SpeechAccentLocale)
+                }
                 onToggleMic={handleToggleMic}
                 onToggleSpeaker={handleToggleSpeaker}
                 onInterrupt={handleInterrupt}

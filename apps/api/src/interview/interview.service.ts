@@ -84,15 +84,31 @@ export class InterviewService implements OnModuleDestroy {
         throw new NotFoundException(`Question '${dto.questionId}' not found`);
       }
     } else {
-      // Find an appropriate initial question based on domain & difficulty
-      question = await this.questionRepo.findOne({
-        where: {
-          domain: dto.domain ?? ProfessionalDomain.SDE,
-          difficulty: dto.difficulty ?? InterviewDifficulty.MEDIUM,
-          isActive: true,
-        },
-        relations: { competency: true } as FindOptionsRelations<Question>,
-      });
+      const targetDomain = dto.domain ?? ProfessionalDomain.SDE;
+      // For SDE interviews (especially SDE 1 / Junior / FAANG), prioritize Data Structures & Algorithmic Problem Solving
+      if (targetDomain === ProfessionalDomain.SDE) {
+        question = await this.questionRepo.findOne({
+          where: {
+            domain: ProfessionalDomain.SDE,
+            isActive: true,
+            ...(dto.difficulty ? { difficulty: dto.difficulty } : {}),
+            competency: { slug: 'sde_dsa_problem_solving' },
+          },
+          relations: { competency: true } as FindOptionsRelations<Question>,
+        });
+      }
+
+      if (!question) {
+        // Fallback to any active question matching domain & difficulty
+        question = await this.questionRepo.findOne({
+          where: {
+            domain: targetDomain,
+            difficulty: dto.difficulty ?? InterviewDifficulty.MEDIUM,
+            isActive: true,
+          },
+          relations: { competency: true } as FindOptionsRelations<Question>,
+        });
+      }
     }
 
     const session = this.sessionRepo.create({

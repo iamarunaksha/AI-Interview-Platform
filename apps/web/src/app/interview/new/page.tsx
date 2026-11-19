@@ -51,9 +51,21 @@ export default function NewInterviewPage() {
       .getQuestions({ domain, difficulty, experienceLevel })
       .then((data) => {
         if (active) {
-          setQuestions(data);
-          if (data.length > 0) {
-            setSelectedQuestionId(data[0].id);
+          // Prioritize DSA questions first for SDE candidates
+          const sorted = [...data].sort((a, b) => {
+            const aIsDsa =
+              a.competency?.slug === "sde_dsa_problem_solving" ||
+              a.competency?.name?.toLowerCase().includes("data structures");
+            const bIsDsa =
+              b.competency?.slug === "sde_dsa_problem_solving" ||
+              b.competency?.name?.toLowerCase().includes("data structures");
+            if (aIsDsa && !bIsDsa) return -1;
+            if (!aIsDsa && bIsDsa) return 1;
+            return 0;
+          });
+          setQuestions(sorted);
+          if (sorted.length > 0) {
+            setSelectedQuestionId(sorted[0].id);
           } else {
             setSelectedQuestionId("");
           }

@@ -30,15 +30,20 @@ export function InterviewHeader({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
-    if (status !== InterviewStatus.IN_PROGRESS) return;
+    if (status === InterviewStatus.COMPLETED) return;
 
+    // Timer begins counting immediately from startedAt or session initiation
     const startTimestamp = startedAt
       ? new Date(startedAt).getTime()
       : Date.now();
-    const interval = setInterval(() => {
+
+    const updateTimer = () => {
       const now = Date.now();
       setElapsedSeconds(Math.max(0, Math.floor((now - startTimestamp) / 1000)));
-    }, 1000);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
   }, [status, startedAt]);
@@ -52,6 +57,7 @@ export function InterviewHeader({
   const getStatusBadge = () => {
     switch (status) {
       case InterviewStatus.IN_PROGRESS:
+      case InterviewStatus.CREATED:
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 animate-pulse">
             <span className="h-2 w-2 rounded-full bg-emerald-400"></span>

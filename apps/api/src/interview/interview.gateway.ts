@@ -154,10 +154,19 @@ export class InterviewGateway
         `Client ${client.id} joined room for session ${sessionId} (User: ${user?.email ?? 'anonymous'})`,
       );
 
-      // Ensure session is marked in progress
-      await this.interviewService.startSession(sessionId).catch(() => {
-        // If already started or completed, keep going
-      });
+      // Ensure session is marked in progress and broadcast live status to client
+      const started = await this.interviewService
+        .startSession(sessionId)
+        .catch(() => null);
+
+      if (started) {
+        client.emit('interview.status', {
+          type: 'interview.status',
+          status: started.status,
+          startedAt: started.startedAt,
+          timestamp: Date.now(),
+        });
+      }
 
       // Bind realtime bridge for this session
       await this.interviewService.createRealtimeBridge(

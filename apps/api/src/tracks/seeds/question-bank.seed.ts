@@ -268,6 +268,255 @@ export const INITIAL_QUESTIONS = [
     ],
   },
   {
+    competencySlug: 'sde_dsa_problem_solving',
+    domain: ProfessionalDomain.SDE,
+    companyCategories: [
+      CompanyCategory.FAANG_STYLE,
+      CompanyCategory.PRODUCT_COMPANY,
+      CompanyCategory.SERVICE_COMPANY,
+    ],
+    experienceLevels: [
+      ExperienceLevel.FRESHER,
+      ExperienceLevel.SDE_1,
+      ExperienceLevel.SDE_2,
+    ],
+    difficulty: InterviewDifficulty.EASY,
+    title: 'Two Sum & Optimal Hash Map Lookups',
+    stem: 'Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. Each input has exactly one solution and you may not use the same element twice. How do you achieve O(N) time complexity?',
+    contextPrompt:
+      'Candidate must demonstrate one-pass hash map complement lookup (target - num) and compare time/space trade-offs with brute force O(N^2) and sorted two-pointer approaches.',
+    expectedConcepts: [
+      'One-pass Hash Map storing (value -> index) for O(1) complement lookup',
+      'Target complement calculation: complement = target - nums[i]',
+      'Overall O(N) time complexity and O(N) auxiliary space complexity',
+      'Handling duplicate elements and avoiding index self-pairing',
+    ],
+    commonMisconceptions: [
+      'Sorting the array without preserving original indices when problem requires 0-based index returns',
+      'Using nested loops resulting in O(N^2) brute force latency',
+      'Two-pass hash map when a single pass suffices by checking complement before inserting',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-twosum-1',
+        probeText:
+          'What happens if the input array contains duplicate values, e.g. [3, 3] with target 6? How does your map store both?',
+        targetConcept: 'Duplicate value handling and insertion order',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-twosum-2',
+        probeText:
+          'If auxiliary memory is strictly O(1) and you cannot allocate a hash map, how would you solve this, and what is the new time complexity?',
+        targetConcept:
+          'Sorting + Two Pointer trade-off (O(N log N) time, O(1) space)',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Only suggests O(N^2) nested loops and cannot formulate hash map complement lookup.',
+        keyIndicators: [
+          'Suggests nested loops',
+          'Unaware of hash map complement technique',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Suggests hash map but requires two passes or struggles with index handling.',
+        keyIndicators: ['Two-pass hash map', 'Struggles with duplicate values'],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Clearly implements one-pass hash map with O(N) time and O(N) space complexity.',
+        keyIndicators: [
+          'One-pass hash map',
+          'Checks complement before insertion',
+          'Articulates space/time trade-off',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Compares hash map, sorting two-pointers, hash collisions, and cache locality of flat arrays vs pointer maps.',
+        keyIndicators: [
+          'Analyzes cache locality',
+          'Compares O(1) space two-pointer approach',
+          'Discusses hash collisions',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sde_dsa_problem_solving',
+    domain: ProfessionalDomain.SDE,
+    companyCategories: [
+      CompanyCategory.FAANG_STYLE,
+      CompanyCategory.PRODUCT_COMPANY,
+    ],
+    experienceLevels: [
+      ExperienceLevel.FRESHER,
+      ExperienceLevel.SDE_1,
+      ExperienceLevel.SDE_2,
+    ],
+    difficulty: InterviewDifficulty.MEDIUM,
+    title: 'Lowest Common Ancestor in Binary Tree',
+    stem: 'Given a binary tree and two nodes p and q, find the lowest common ancestor (LCA) node in the tree. The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself).',
+    contextPrompt:
+      'Candidate must demonstrate post-order recursive divide-and-conquer traversal, base conditions, and analyze call stack memory complexity.',
+    expectedConcepts: [
+      'Recursive post-order DFS traversal (left, right, root)',
+      'Base cases: root == null, root == p, root == q',
+      'When both left and right recursive calls return non-null, current root is the LCA',
+      'Time complexity O(N) visiting each node once, space complexity O(H) call stack height',
+    ],
+    commonMisconceptions: [
+      'Assuming the tree is a Binary Search Tree (BST) when the problem states general Binary Tree',
+      'Allocating full parent pointer maps when a pure recursive post-order traversal needs zero extra data structures',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-lca-1',
+        probeText:
+          'What happens in the recursion if node p is an ancestor of node q? How does your base case return the correct LCA?',
+        targetConcept: 'Self-descendant base condition',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-lca-2',
+        probeText:
+          'What is the worst-case space complexity of your recursive call stack, and when does it degrade to O(N)?',
+        targetConcept: 'Call stack depth in skewed binary trees',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Confuses Binary Tree with BST or cannot formulate recursive base conditions.',
+        keyIndicators: [
+          'Assumes tree is sorted BST',
+          'Cannot structure tree traversal',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Understands recursion but struggles with combining results from left and right subtrees.',
+        keyIndicators: [
+          'Vague return bubbling',
+          'Misses base case where node is ancestor of other',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Implements clean post-order DFS in O(N) time and O(H) space with clear base cases.',
+        keyIndicators: [
+          'Post-order DFS',
+          'O(N) time, O(H) space',
+          'Handles both nodes found in different subtrees',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Analyzes iterative parent-pointer solutions vs recursion, discusses tree balancing, and handles missing node edge cases.',
+        keyIndicators: [
+          'Iterative hash map path comparison',
+          'Analyzes skewed tree stack overflow mitigations',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sde_dsa_problem_solving',
+    domain: ProfessionalDomain.SDE,
+    companyCategories: [
+      CompanyCategory.FAANG_STYLE,
+      CompanyCategory.PRODUCT_COMPANY,
+      CompanyCategory.SERVICE_COMPANY,
+    ],
+    experienceLevels: [ExperienceLevel.FRESHER, ExperienceLevel.SDE_1],
+    difficulty: InterviewDifficulty.EASY,
+    title: 'Valid Parentheses & Balanced Bracket Parsing',
+    stem: 'Given a string s containing just the characters "(", ")", "{", "}", "[" and "]", determine if the input string is valid. Open brackets must be closed by the same type of brackets and in the correct order. How do you implement this efficiently?',
+    contextPrompt:
+      'Candidate must demonstrate Stack (LIFO) data structure, hash map for bracket pairs, and handle edge cases like odd lengths or unmatched closing brackets.',
+    expectedConcepts: [
+      'Stack data structure for Last-In-First-Out (LIFO) matching',
+      'Hash Map mapping closing brackets to opening brackets',
+      'Edge case: odd length string can never be valid (return false early in O(1))',
+      'Time complexity O(N) single pass, space complexity O(N) stack capacity',
+    ],
+    commonMisconceptions: [
+      'Using simple counter variables instead of a stack (fails on interleaving brackets like "([)]")',
+      'Forgetting to check if stack is empty when encountering a closing bracket (causes stack underflow error)',
+      'Forgetting to verify stack is completely empty at end of string (fails on unclosed brackets like "(()")',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-paren-1',
+        probeText:
+          'Why does a counter variable (like count++ for "(" and count-- for ")") fail for multiple bracket types like "([)]"?',
+        targetConcept: 'LIFO requirement for nested multi-bracket types',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-paren-2',
+        probeText:
+          'How does your solution handle a string with 1 million opening brackets? What is the maximum memory consumed?',
+        targetConcept: 'O(N) auxiliary space scaling on stack',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Attempts to use integer counters, unaware that interleaving brackets violate balance.',
+        keyIndicators: [
+          'Counter approach for multi-brackets',
+          'Unaware of Stack LIFO property',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Uses a stack but misses empty stack checks or does not verify empty stack at end.',
+        keyIndicators: [
+          'Misses underflow check',
+          'Returns true for unclosed "("',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Implements complete stack matching in O(N) time and O(N) space with map lookup and all boundary checks.',
+        keyIndicators: [
+          'Stack with bracket map',
+          'Empty stack underflow guard',
+          'Final empty stack verification',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Optimizes early return for odd length strings, compares array-backed deque vs linked stack, and discusses cache friendliness.',
+        keyIndicators: [
+          'Early length check',
+          'Deque vs Stack comparison',
+          'Discusses streaming inputs',
+        ],
+      },
+    ],
+  },
+  {
     competencySlug: 'sde_system_design',
     domain: ProfessionalDomain.SDE,
     companyCategories: [

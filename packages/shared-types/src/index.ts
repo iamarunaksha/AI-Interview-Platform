@@ -307,7 +307,12 @@ export type ConversationEvent =
   | { type: "assistant.audio.ended"; timestamp: number }
   | { type: "assistant.interrupted"; timestamp: number }
   | { type: "turn.completed"; timestamp: number }
-  | { type: "interview.status"; status: InterviewStatus; timestamp: number }
+  | {
+      type: "interview.status";
+      status: InterviewStatus;
+      startedAt?: string | Date;
+      timestamp: number;
+    }
   | { type: "session.error"; code: string; message: string; timestamp: number }
   | { type: "session.ended"; reason: string; timestamp: number }
   | { type: "orchestrator.state"; state: OrchestratorState; timestamp: number }

@@ -72,7 +72,7 @@ export class MockAiAdapter
     }
 
     return {
-      text: `[Mock AI Response]: Based on your answer regarding architectural trade-offs, that demonstrates a solid grasp of concurrency. Could you explain what happens if the network partitions between your nodes?`,
+      text: `That is a solid technical explanation. Let us explore the time and space complexity trade-offs, and consider how your solution handles edge cases and scale.`,
       finishReason: 'STOP',
       modelName: this.modelName,
       usage: { promptTokens: 30, completionTokens: 35, totalTokens: 65 },
@@ -237,8 +237,12 @@ class MockRealtimeSession implements IRealtimeSession {
 
     let replyText = '';
 
-    // 1. If LLM provider (e.g. Gemini) is configured and active, try generating with LLM
-    if (this.config.llmProvider && this.config.llmProvider.isConfigured) {
+    // 1. If an external LLM provider (e.g. Gemini) is configured and active, try generating with LLM
+    if (
+      this.config.llmProvider &&
+      this.config.llmProvider.name !== 'mock' &&
+      this.config.llmProvider.isConfigured
+    ) {
       try {
         const history: ChatMessage[] = (
           this.config.session?.transcript || []
@@ -287,8 +291,8 @@ class MockRealtimeSession implements IRealtimeSession {
       session?.domain === ProfessionalDomain.SAP ||
       question?.domain === ProfessionalDomain.SAP;
 
-    // Check greeting / readiness
-    const isGreeting =
+    // Check greeting / readiness / affirmation
+    const isGreetingOrReady =
       lower.includes('hi') ||
       lower.includes('hello') ||
       lower.includes('ready') ||
@@ -296,18 +300,197 @@ class MockRealtimeSession implements IRealtimeSession {
       lower.includes('begin') ||
       lower.includes('doing well') ||
       lower.includes('good') ||
-      lower.includes('hey');
+      lower.includes('hey') ||
+      lower.includes('dive in') ||
+      lower.includes('diving') ||
+      lower.includes('yes') ||
+      lower.includes('yeah') ||
+      lower.includes('sure') ||
+      lower.includes('let us') ||
+      lower.includes("let's") ||
+      lower.includes('ok') ||
+      lower.includes('okay') ||
+      lower.includes('yep');
 
-    if (this.turnCount <= 1 && isGreeting) {
+    if (this.turnCount <= 2 && isGreetingOrReady) {
       if (question) {
         return isSap
           ? `Great! Let's examine this enterprise challenge: "${question.title}".\n\n${question.stem}\n\nTo begin, walk me through how you would architect this solution while upholding SAP Clean Core standards.`
           : `Great! Let's examine our technical challenge today: "${question.title}".\n\n${question.stem}\n\nTo begin, walk me through your high-level approach: what data structures would you select, and what are your target time and space complexities?`;
       }
-      return `Great! Let's dive into the technical problem. How would you approach designing a high-throughput, low-latency solution for this scenario?`;
+      return `Great! Let's dive into the technical problem. How would you approach designing an optimal solution for this scenario?`;
     }
 
-    // Question-specific logic for DSA / LRU Cache
+    // 1. Database Indexing & B+ Trees (if active)
+    const isDbBTree =
+      question?.title?.toLowerCase().includes('b+ tree') ||
+      question?.title?.toLowerCase().includes('database indexing') ||
+      question?.stem?.toLowerCase().includes('b+ tree');
+
+    if (isDbBTree) {
+      if (
+        lower.includes('range') ||
+        lower.includes('leaf') ||
+        lower.includes('leaves') ||
+        lower.includes('doubly linked')
+      ) {
+        return `Spot on. Because all leaf nodes in a B+ Tree are sequentially linked via doubly linked pointers, range scans (e.g. WHERE age BETWEEN 20 AND 30) only require traversing to the first leaf node and scanning horizontally, avoiding expensive repeated tree traversals. How does this compare to Hash Indexes for range queries?`;
+      }
+      if (
+        lower.includes('fanout') ||
+        lower.includes('height') ||
+        lower.includes('disk') ||
+        lower.includes('page') ||
+        lower.includes('i/o') ||
+        lower.includes('io')
+      ) {
+        return `Exactly. A high fanout drastically reduces tree height, meaning searching a record typically requires only 3 to 4 disk page reads even for millions of rows. Why do B+ Trees store values strictly in leaf nodes rather than internal nodes like standard B-Trees?`;
+      }
+      if (
+        lower.includes('hash') ||
+        lower.includes('equality') ||
+        lower.includes('point lookup')
+      ) {
+        return `Correct. Hash tables offer O(1) point lookups for equality checks (WHERE id = 5), but completely fail on range scans, sorting (ORDER BY), and prefix lookups. How do database buffer pools and page caching optimize B+ Tree traversal in memory?`;
+      }
+      if (question?.probingQuestions && question.probingQuestions.length > 0) {
+        const probe =
+          question.probingQuestions[
+            (this.turnCount - 1) % question.probingQuestions.length
+          ];
+        return `Good analysis. ${probe.probeText}`;
+      }
+      return `Solid reasoning. Walk me through the exact I/O operations and disk page reads when an index lookup traverses from the root node to the matching leaf node.`;
+    }
+
+    // 2. Two Sum & Array Hash Mapping
+    const isTwoSum =
+      question?.title?.toLowerCase().includes('two sum') ||
+      question?.stem?.toLowerCase().includes('two sum');
+
+    if (isTwoSum) {
+      if (
+        lower.includes('hash') ||
+        lower.includes('map') ||
+        lower.includes('dict') ||
+        lower.includes('complement')
+      ) {
+        return `Spot on. Using a hash map to store each visited number and its index allows checking for the complement (target - num) in O(1) average time, giving an overall O(N) time and O(N) space complexity. How would your implementation handle duplicate numbers or when the target requires adding a number to itself?`;
+      }
+      if (
+        lower.includes('sort') ||
+        lower.includes('two pointer') ||
+        lower.includes('binary search')
+      ) {
+        return `That is a classic two-pointer strategy. Sorting the array takes O(N log N) time and allows two pointers to converge in O(N) time with O(1) auxiliary space. However, how does sorting affect the original element indices if the problem asks to return 0-based indices?`;
+      }
+      if (
+        lower.includes('brute') ||
+        lower.includes('nested') ||
+        lower.includes('o(n^2)') ||
+        lower.includes('n square')
+      ) {
+        return `A nested loop brute force checks all pairs in O(N²) time and O(1) space. How can we trade auxiliary space to optimize this down to linear O(N) time?`;
+      }
+      if (question?.probingQuestions && question.probingQuestions.length > 0) {
+        const probe =
+          question.probingQuestions[
+            (this.turnCount - 1) % question.probingQuestions.length
+          ];
+        return `Good thinking. ${probe.probeText}`;
+      }
+      return `Understood. Walk me through the exact code logic for handling the case where no valid pair exists in the input array.`;
+    }
+
+    // 3. Tree LCA / Binary Tree Traversal
+    const isTreeLca =
+      question?.title?.toLowerCase().includes('lowest common ancestor') ||
+      question?.title?.toLowerCase().includes('binary tree');
+
+    if (isTreeLca) {
+      if (
+        lower.includes('recur') ||
+        lower.includes('dfs') ||
+        lower.includes('postorder')
+      ) {
+        return `Spot on. Post-order DFS traversal recursively searches left and right subtrees; when both subtrees return non-null matches, the current root is the LCA. What are the base conditions, and what is the call stack space complexity in a skewed tree?`;
+      }
+      if (
+        lower.includes('parent pointer') ||
+        lower.includes('ancestor') ||
+        lower.includes('path')
+      ) {
+        return `Storing ancestor paths or parent pointers using a hash set enables finding the intersection in O(H) time. How does this compare with the pure recursive divide-and-conquer approach in terms of auxiliary memory?`;
+      }
+      if (question?.probingQuestions && question.probingQuestions.length > 0) {
+        const probe =
+          question.probingQuestions[
+            (this.turnCount - 1) % question.probingQuestions.length
+          ];
+        return `Good insight. ${probe.probeText}`;
+      }
+      return `Understood. How does your algorithm handle the edge case where one of the target nodes is itself the ancestor of the other?`;
+    }
+
+    // 4. Valid Parentheses / Stacks
+    const isStackQuestion =
+      question?.title?.toLowerCase().includes('parentheses') ||
+      question?.title?.toLowerCase().includes('bracket') ||
+      question?.stem?.toLowerCase().includes('parentheses');
+
+    if (isStackQuestion) {
+      if (lower.includes('stack') || lower.includes('lifo')) {
+        return `Excellent choice. A stack naturally handles Last-In-First-Out matching of nested bracket pairs. How would you handle edge cases such as a closing bracket appearing when the stack is empty, or remaining open brackets after parsing the entire string?`;
+      }
+      if (
+        lower.includes('map') ||
+        lower.includes('hash') ||
+        lower.includes('lookup')
+      ) {
+        return `Pairing the stack with a lookup map for closing-to-opening bracket pairs makes the matching code concise and easily extensible to new bracket types. What are your time and space complexity targets for this solution?`;
+      }
+      if (question?.probingQuestions && question.probingQuestions.length > 0) {
+        const probe =
+          question.probingQuestions[
+            (this.turnCount - 1) % question.probingQuestions.length
+          ];
+        return `Good point. ${probe.probeText}`;
+      }
+      return `Understood. Walk me through how your implementation handles an odd-length string or an empty string input.`;
+    }
+
+    // 5. Sliding Window / Longest Substring
+    const isSlidingWindow =
+      question?.title?.toLowerCase().includes('substring') ||
+      question?.title?.toLowerCase().includes('sliding window');
+
+    if (isSlidingWindow) {
+      if (
+        lower.includes('window') ||
+        lower.includes('two pointer') ||
+        lower.includes('left') ||
+        lower.includes('right')
+      ) {
+        return `Spot on. Maintaining a dynamic sliding window where the right pointer expands and the left pointer contracts on duplicate characters yields an optimal O(N) solution. What auxiliary data structure would you use to track character occurrences inside the window?`;
+      }
+      if (
+        lower.includes('set') ||
+        lower.includes('map') ||
+        lower.includes('hash')
+      ) {
+        return `Using a hash map to store the last seen index of each character allows the left pointer to jump directly past duplicate characters in O(1) time without stepwise increments. What is the space complexity bound given the character set (ASCII / Unicode)?`;
+      }
+      if (question?.probingQuestions && question.probingQuestions.length > 0) {
+        const probe =
+          question.probingQuestions[
+            (this.turnCount - 1) % question.probingQuestions.length
+          ];
+        return `Good analysis. ${probe.probeText}`;
+      }
+      return `Understood. Walk me through how your algorithm updates the maximum length variable as the window expands.`;
+    }
+
+    // 6. Question-specific logic for DSA / LRU Cache
     const isLruCache =
       question?.title?.toLowerCase().includes('lru') ||
       question?.stem?.toLowerCase().includes('lru');
@@ -365,7 +548,7 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Understood. Walk me through the exact step-by-step logic when get(key) is called on an existing key versus a missing key.`;
     }
 
-    // SAP-specific logic
+    // 7. SAP-specific logic
     if (isSap) {
       if (lower.includes('bdef') || lower.includes('rap')) {
         return `Good grasp of the ABAP RESTful Application Programming model. In the RAP save sequence, how do you handle transactional determinations without triggering commit dumps?`;
@@ -387,7 +570,7 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Solid architectural breakdown. How does this extension strictly adhere to SAP Clean Core Tier 2 developer extensibility with released C1 APIs when quarterly cloud upgrades occur?`;
     }
 
-    // General SDE / System Design / DSA
+    // 8. General SDE / System Design / DSA fallback
     if (question?.probingQuestions && question.probingQuestions.length > 0) {
       const probe =
         question.probingQuestions[
