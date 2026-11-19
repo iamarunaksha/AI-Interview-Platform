@@ -705,115 +705,264 @@ function OnboardingWizard({
 }
 
 function Step7HardwarePreview() {
-  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const [isActive, setIsActive] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [micVolume, setMicVolume] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const animFrameRef = useRef<number | null>(null);
 
-  // Callback ref to attach stream immediately upon mounting
-  const setVideoRef = useCallback(
-    (el: HTMLVideoElement | null) => {
-      videoRef.current = el;
-      if (el && mediaStream) {
-        if (el.srcObject !== mediaStream) {
-          el.srcObject = mediaStream;
-        }
-        el.play().catch(() => {});
-      }
-    },
-    [mediaStream],
-  );
-
-  // Auto-attach if stream changes while mounted
-  useEffect(() => {
-    if (mediaStream && videoRef.current) {
-      if (videoRef.current.srcObject !== mediaStream) {
-        videoRef.current.srcObject = mediaStream;
-      }
-      videoRef.current.play().catch(() => {});
+  const stopHardwareCheck = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
     }
-  }, [mediaStream]);
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsActive(false);
+    setMicVolume(0);
+  }, []);
 
-  // Clean up and release hardware when Step 7 unmounts
-  useEffect(() => {
-    return () => {
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [mediaStream]);
-
-  const startMediaCheck = async () => {
+  const startHardwareCheck = useCallback(async () => {
+    stopHardwareCheck();
     setMediaError(null);
+
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      setMediaError(
+        "Webcam and microphone access is not supported by this browser.",
+      );
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user",
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
       });
-      setMediaStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(() => {});
-      }
-    } catch {
-      setMediaError(
-        "Camera/Microphone permission denied or not found. You can still test, but permissions are needed for actual voice/video interviews.",
-      );
-    }
-  };
 
-  const stopMediaCheck = () => {
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => track.stop());
-      setMediaStream(null);
+      streamRef.current = stream;
+
+      // Attach video stream to video element
+      const videoEl = videoRef.current;
+      if (videoEl) {
+        videoEl.muted = true;
+        videoEl.defaultMuted = true;
+        videoEl.playsInline = true;
+        videoEl.setAttribute("muted", "");
+        videoEl.setAttribute("playsinline", "");
+        videoEl.setAttribute("autoplay", "");
+        videoEl.srcObject = stream;
+        videoEl.onloadedmetadata = () => {
+          videoEl.play().catch((err) => console.warn("Video play error:", err));
+        };
+        if (videoEl.readyState >= 1) {
+          videoEl.play().catch(() => {});
+        }
+      }
+
+      // Audio volume monitoring via AnalyserNode
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        try {
+          const AudioContextClass =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext })
+              .webkitAudioContext;
+          if (AudioContextClass) {
+            const ctx = new AudioContextClass();
+            audioContextRef.current = ctx;
+            const source = ctx.createMediaStreamSource(stream);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const updateVolume = () => {
+              if (!audioContextRef.current) return;
+              analyser.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+              }
+              const average = sum / dataArray.length;
+              // Normalize volume 0 to 100
+              const vol = Math.min(100, Math.round((average / 128) * 100 * 2));
+              setMicVolume(vol);
+              animFrameRef.current = requestAnimationFrame(updateVolume);
+            };
+            updateVolume();
+          }
+        } catch {
+          // Audio analyzer is an optional enhancement
+        }
+      }
+
+      setIsActive(true);
+    } catch (err: unknown) {
+      console.warn("Hardware check error:", err);
+      const isNotAllowed =
+        err instanceof DOMException && err.name === "NotAllowedError";
+      setMediaError(
+        isNotAllowed
+          ? "Camera or microphone permission was denied. Please allow access in browser settings to test your hardware."
+          : "Could not access camera or microphone. Please check your connections.",
+      );
+      setIsActive(false);
     }
-  };
+  }, [stopHardwareCheck]);
+
+  // Clean up hardware on unmount
+  useEffect(() => {
+    return () => {
+      stopHardwareCheck();
+    };
+  }, [stopHardwareCheck]);
+
+  // Auto-initiate check on mount asynchronously to prevent cascading renders
+  useEffect(() => {
+    let mounted = true;
+    const timer = setTimeout(() => {
+      if (mounted) {
+        void startHardwareCheck();
+      }
+    }, 100);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, [startHardwareCheck]);
 
   return (
-    <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center min-h-[200px]">
-      {mediaStream ? (
-        <div className="w-full flex flex-col items-center">
-          <video
-            ref={setVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-44 object-cover rounded-lg bg-black -scale-x-100"
-          />
-          <div className="mt-3 w-full flex items-center justify-between text-xs text-green-600 dark:text-green-400 font-medium">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span>Camera &amp; Microphone Active</span>
-            </div>
+    <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50 dark:bg-zinc-950 flex flex-col justify-between min-h-[260px]">
+      {/* Video Viewport Container */}
+      <div className="relative w-full h-48 bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 flex items-center justify-center">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`w-full h-full object-cover scale-x-[-1] transition-opacity duration-300 ${
+            isActive ? "opacity-100" : "opacity-0 absolute"
+          }`}
+        />
+
+        {!isActive && (
+          <div className="flex flex-col items-center justify-center p-6 text-center text-zinc-400 space-y-2">
+            <span className="text-3xl">📹</span>
+            <p className="text-xs font-semibold text-zinc-300">
+              Camera Preview Paused
+            </p>
+            <p className="text-[11px] text-zinc-500">
+              Click below to grant camera &amp; mic access.
+            </p>
             <button
               type="button"
-              onClick={stopMediaCheck}
-              className="text-[11px] text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 underline font-normal transition-colors"
+              onClick={startHardwareCheck}
+              className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
             >
-              Turn Off Camera
+              Test Camera &amp; Mic
             </button>
           </div>
-        </div>
-      ) : (
-        <div className="text-center py-4">
-          <div className="text-3xl mb-2">🎙️ 📹</div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-            Click below to verify microphone &amp; camera access.
-          </p>
-          <button
-            type="button"
-            onClick={startMediaCheck}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-          >
-            Test Camera &amp; Mic
-          </button>
-        </div>
-      )}
+        )}
 
-      {mediaError && (
-        <p className="text-[11px] text-amber-600 dark:text-amber-400 text-center mt-2 px-2">
-          {mediaError}
-        </p>
-      )}
+        {isActive && (
+          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>HD Video Feed Active</span>
+          </div>
+        )}
+      </div>
+
+      {/* Hardware Status & Microphone VU Meter */}
+      <div className="mt-3 space-y-2">
+        {isActive ? (
+          <>
+            <div className="flex items-center justify-between text-xs text-zinc-700 dark:text-zinc-300">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  Camera &amp; Microphone Connected
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={stopHardwareCheck}
+                className="text-[11px] text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 underline transition-colors"
+              >
+                Turn Off Hardware
+              </button>
+            </div>
+
+            {/* Microphone Live VU Meter */}
+            <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2.5">
+              <div className="flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  🎙️ Microphone Input Level:
+                </span>
+                <span
+                  className={`font-mono text-[10px] font-bold ${
+                    micVolume > 15
+                      ? "text-emerald-500"
+                      : "text-zinc-400 dark:text-zinc-500"
+                  }`}
+                >
+                  {micVolume > 15 ? "Speaking Detected" : "Quiet / Ready"}
+                </span>
+              </div>
+              <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-75 rounded-full ${
+                    micVolume > 60
+                      ? "bg-amber-500"
+                      : micVolume > 15
+                        ? "bg-emerald-500"
+                        : "bg-emerald-600/40"
+                  }`}
+                  style={{ width: `${Math.max(4, Math.min(100, micVolume))}%` }}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-between text-xs text-zinc-500">
+            <span>Hardware verification pending</span>
+            <button
+              type="button"
+              onClick={startHardwareCheck}
+              className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-medium"
+            >
+              Start Hardware Test
+            </button>
+          </div>
+        )}
+
+        {mediaError && (
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 text-center px-1">
+            {mediaError}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -13,7 +13,60 @@ export class AudioPlayerPipeline {
   private lastSpokenText = "";
   private lastSpokenTimestamp = 0;
 
-  constructor() {}
+  constructor() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        // Pre-cache voices when browser loads them
+        this.getNaturalVoice();
+      };
+    }
+  }
+
+  /**
+   * Select a natural, human-like voice for the interviewer instead of default robotic synths.
+   */
+  private getNaturalVoice(): SpeechSynthesisVoice | null {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return null;
+    }
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return null;
+
+    // Prioritize natural/enhanced English voices
+    const preferredNames = [
+      "Google US English",
+      "Google UK English Female",
+      "Samantha",
+      "Karen",
+      "Serena",
+      "Daniel",
+      "Alex",
+      "Ava",
+      "Allison",
+      "Microsoft Jenny Online",
+      "Microsoft Guy Online",
+      "Microsoft Aria Online",
+    ];
+
+    for (const name of preferredNames) {
+      const match = voices.find(
+        (v) =>
+          v.name.toLowerCase().includes(name.toLowerCase()) ||
+          v.voiceURI.toLowerCase().includes(name.toLowerCase()),
+      );
+      if (match) return match;
+    }
+
+    // Next preference: any English (US/GB) voice
+    const englishVoice = voices.find(
+      (v) => v.lang === "en-US" || v.lang === "en_US" || v.lang === "en-GB",
+    );
+    if (englishVoice) return englishVoice;
+
+    // Fallback: any English voice
+    const anyEnglish = voices.find((v) => v.lang.startsWith("en"));
+    return anyEnglish ?? voices[0] ?? null;
+  }
 
   private getAudioContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
@@ -126,7 +179,11 @@ export class AudioPlayerPipeline {
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.rate = 1.05;
+      const voice = this.getNaturalVoice();
+      if (voice) {
+        utterance.voice = voice;
+      }
+      utterance.rate = 0.98; // Natural, measured conversational pace
       utterance.pitch = 1.0;
 
       utterance.onstart = () => {

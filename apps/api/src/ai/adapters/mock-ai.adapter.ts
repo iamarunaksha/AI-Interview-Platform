@@ -122,13 +122,9 @@ export class MockAiAdapter
     config: RealtimeSessionConfig,
   ): Promise<IRealtimeSession> {
     this.logger.debug(
-      `[MockRealtime] Creating mock session for ${config.sessionId}`,
+      `[MockRealtime] Creating adaptive realtime session for ${config.sessionId}`,
     );
-    const isSap =
-      config.systemInstruction?.toLowerCase().includes('sap') ||
-      config.systemInstruction?.toLowerCase().includes('clean core') ||
-      false;
-    return new MockRealtimeSession(config.sessionId, isSap);
+    return new MockRealtimeSession(config);
   }
 
   // ── IEvaluationProvider implementation ───────────────────
@@ -211,101 +207,24 @@ export class MockAiAdapter
 
 class MockRealtimeSession implements IRealtimeSession {
   private eventHandlers: Array<(event: ConversationEvent) => void> = [];
-  private isCandidateSpeaking = false;
   private isAssistantSpeaking = false;
-  private audioSilenceTimer: NodeJS.Timeout | null = null;
   private turnCount = 0;
   private lastTurnTimestamp = 0;
 
-  private readonly questions: string[];
-
-  constructor(
-    readonly sessionId: string,
-    private readonly isSap = false,
-  ) {
-    this.questions = isSap
-      ? [
-          'Could you walk me through your high-level architecture and how your design aligns with SAP Clean Core principles?',
-          'Good. How does your solution ensure transactional integrity and SAP LUW consistency across the save sequence?',
-          'Interesting. How do you handle integration exceptions, idempotent receivers, and error escalation in this scenario?',
-          'How would you scale this design to handle high-volume postings in S/4HANA Universal Journal (ACDOCA) without locking bottlenecks?',
-          'That was a thorough architectural breakdown. How do you ensure this extension survives quarterly S/4HANA Cloud upgrades without regression?',
-        ]
-      : [
-          'Could you walk me through your high-level architecture and how requests flow through the system?',
-          'Good. How do you handle cache invalidation and ensure strong data consistency under partition failures?',
-          'Interesting. How do you prevent race conditions when multiple concurrent nodes attempt to mutate the state?',
-          'How would you monitor and measure p99 latency spikes and handle circuit breaker fallbacks in production?',
-          'That was a thorough technical breakdown. Let us explore edge cases and how your service fails over under region outages.',
-        ];
-
+  constructor(private readonly config: RealtimeSessionConfig) {
     // Emit session.ready after tick
     setTimeout(() => {
       this.emit({ type: 'session.ready', timestamp: Date.now() });
     }, 10);
   }
 
-  async sendAudio(_pcmChunk: Buffer | Uint8Array): Promise<void> {
-    const now = Date.now();
-    // Ignore incoming audio if assistant is speaking or turn was finalized recently to avoid acoustic echo loops
-    if (this.isAssistantSpeaking || now - this.lastTurnTimestamp < 1500) {
-      return;
-    }
-
-    if (!this.isCandidateSpeaking) {
-      this.isCandidateSpeaking = true;
-      this.emit({ type: 'candidate.speech.started', timestamp: now });
-    }
-
-    // Reset silence timer on every chunk (simulating voice activity detection)
-    if (this.audioSilenceTimer) {
-      clearTimeout(this.audioSilenceTimer);
-    }
-
-    // When candidate pauses for 800ms, finalize turn
-    this.audioSilenceTimer = setTimeout(() => {
-      this.finalizeCandidateTurn();
-    }, 800);
+  get sessionId(): string {
+    return this.config.sessionId;
   }
 
-  private finalizeCandidateTurn() {
-    if (!this.isCandidateSpeaking) return;
-    this.isCandidateSpeaking = false;
-    const now = Date.now();
-    this.lastTurnTimestamp = now;
-
-    const transcriptText = this.isSap
-      ? 'In our S/4HANA architecture, we enforce Clean Core Tier 2 developer extensibility with released C1 APIs, avoiding direct DB updates and letting the RAP transaction manager govern ACDOCA postings.'
-      : 'In our architecture, we use distributed token bucket rate limiting in Redis with write-through caching and master-replica failover to keep p99 latency low.';
-
-    this.emit({
-      type: 'candidate.transcript.final',
-      text: transcriptText,
-      timestamp: now,
-    });
-    this.emit({ type: 'candidate.speech.ended', timestamp: now });
-
-    // Assistant responds after short pause
-    setTimeout(() => {
-      this.isAssistantSpeaking = true;
-      this.emit({ type: 'assistant.response.started', timestamp: Date.now() });
-
-      const nextQuestion =
-        this.questions[this.turnCount % this.questions.length];
-      this.turnCount++;
-
-      this.emit({
-        type: 'assistant.transcript.final',
-        text: nextQuestion,
-        timestamp: Date.now(),
-      });
-      this.emit({ type: 'turn.completed', timestamp: Date.now() });
-
-      // Assistant finishes speaking after simulated duration
-      setTimeout(() => {
-        this.isAssistantSpeaking = false;
-      }, 2500);
-    }, 400);
+  async sendAudio(_pcmChunk: Buffer | Uint8Array): Promise<void> {
+    // Only track audio activity. Candidate spoken transcripts are handled via client-side SpeechRecognition and sent through sendText.
+    return;
   }
 
   async sendText(text: string): Promise<void> {
@@ -314,12 +233,42 @@ class MockRealtimeSession implements IRealtimeSession {
     this.isAssistantSpeaking = true;
     this.emit({ type: 'assistant.response.started', timestamp: now });
 
-    const nextQuestion = this.questions[this.turnCount % this.questions.length];
     this.turnCount++;
+
+    let replyText = '';
+
+    // 1. If LLM provider (e.g. Gemini) is configured and active, try generating with LLM
+    if (this.config.llmProvider && this.config.llmProvider.isConfigured) {
+      try {
+        const history: ChatMessage[] = (
+          this.config.session?.transcript || []
+        ).map((t: { role: string; text: string }) => ({
+          role: t.role === 'assistant' ? 'assistant' : 'user',
+          content: t.text,
+        }));
+        history.push({ role: 'user', content: text });
+
+        const result = await this.config.llmProvider.generateChat(history, {
+          systemInstruction: this.config.systemInstruction,
+          temperature: 0.7,
+        });
+        replyText = result.text;
+      } catch (err) {
+        console.warn(
+          'LLM generation failed in realtime session, using dynamic engine fallback:',
+          err,
+        );
+      }
+    }
+
+    // 2. If no LLM reply, use problem-aware contextual dialogue engine
+    if (!replyText) {
+      replyText = this.generateContextualResponse(text);
+    }
 
     this.emit({
       type: 'assistant.transcript.final',
-      text: `Acknowledged: "${text.slice(0, 40)}...". ${nextQuestion}`,
+      text: replyText,
       timestamp: Date.now(),
     });
     this.emit({ type: 'turn.completed', timestamp: Date.now() });
@@ -329,22 +278,133 @@ class MockRealtimeSession implements IRealtimeSession {
     }, 2000);
   }
 
-  async interrupt(): Promise<void> {
-    if (this.audioSilenceTimer) {
-      clearTimeout(this.audioSilenceTimer);
-      this.audioSilenceTimer = null;
+  private generateContextualResponse(candidateText: string): string {
+    const session = this.config.session;
+    const question = session?.currentQuestion;
+    const lower = candidateText.toLowerCase().trim();
+
+    const isSap =
+      session?.domain === ProfessionalDomain.SAP ||
+      question?.domain === ProfessionalDomain.SAP;
+
+    // Check greeting / readiness
+    const isGreeting =
+      lower.includes('hi') ||
+      lower.includes('hello') ||
+      lower.includes('ready') ||
+      lower.includes('start') ||
+      lower.includes('begin') ||
+      lower.includes('doing well') ||
+      lower.includes('good') ||
+      lower.includes('hey');
+
+    if (this.turnCount <= 1 && isGreeting) {
+      if (question) {
+        return isSap
+          ? `Great! Let's examine this enterprise challenge: "${question.title}".\n\n${question.stem}\n\nTo begin, walk me through how you would architect this solution while upholding SAP Clean Core standards.`
+          : `Great! Let's examine our technical challenge today: "${question.title}".\n\n${question.stem}\n\nTo begin, walk me through your high-level approach: what data structures would you select, and what are your target time and space complexities?`;
+      }
+      return `Great! Let's dive into the technical problem. How would you approach designing a high-throughput, low-latency solution for this scenario?`;
     }
-    this.isCandidateSpeaking = false;
+
+    // Question-specific logic for DSA / LRU Cache
+    const isLruCache =
+      question?.title?.toLowerCase().includes('lru') ||
+      question?.stem?.toLowerCase().includes('lru');
+
+    if (isLruCache) {
+      const mentionsMap =
+        lower.includes('hash') ||
+        lower.includes('map') ||
+        lower.includes('dict');
+      const mentionsList =
+        lower.includes('linked list') ||
+        lower.includes('doubly') ||
+        lower.includes('node');
+      const mentionsSentinel =
+        lower.includes('dummy') ||
+        lower.includes('sentinel') ||
+        lower.includes('head') ||
+        lower.includes('tail');
+      const mentionsConcurrency =
+        lower.includes('lock') ||
+        lower.includes('mutex') ||
+        lower.includes('readwrite') ||
+        lower.includes('concurrent') ||
+        lower.includes('thread') ||
+        lower.includes('synchroniz');
+
+      if (mentionsConcurrency) {
+        return `Excellent explanation of concurrency control. Using segmented lock sharding or a ReadWriteLock prevents the cache from becoming a global bottleneck during read-heavy traffic. What are the key boundary conditions and edge cases you would test before deploying this cache?`;
+      }
+
+      if (mentionsSentinel) {
+        return `Spot on. Sentinel dummy head and tail nodes cleanly eliminate edge-case null pointer checks during node insertion and deletion. Now, how would you make this cache safe for concurrent access when multiple threads call get() and put() simultaneously?`;
+      }
+
+      if (mentionsMap && mentionsList) {
+        return `That is the optimal combination. Pairing a hash map for O(1) key lookups with a doubly linked list for O(1) node detachment and move-to-head operations gives us the desired O(1) get and put performance. How would you structure sentinel dummy head and tail pointers to avoid null pointer edge cases?`;
+      }
+
+      if (mentionsMap && !mentionsList) {
+        return `A hash map provides O(1) key-to-value lookups, but by itself cannot order elements by recency in O(1). What auxiliary linear data structure would you pair with the map to achieve O(1) eviction of the least recently used item?`;
+      }
+
+      if (mentionsList && !mentionsMap) {
+        return `A linked list tracks access order well, but searching for an arbitrary key takes O(N) traversal. How can you bring key lookup down to O(1) time?`;
+      }
+
+      if (question.probingQuestions && question.probingQuestions.length > 0) {
+        const probe =
+          question.probingQuestions[
+            (this.turnCount - 1) % question.probingQuestions.length
+          ];
+        return `Good analysis. Let me ask you: ${probe.probeText}`;
+      }
+
+      return `Understood. Walk me through the exact step-by-step logic when get(key) is called on an existing key versus a missing key.`;
+    }
+
+    // SAP-specific logic
+    if (isSap) {
+      if (lower.includes('bdef') || lower.includes('rap')) {
+        return `Good grasp of the ABAP RESTful Application Programming model. In the RAP save sequence, how do you handle transactional determinations without triggering commit dumps?`;
+      }
+      if (
+        lower.includes('acdoca') ||
+        lower.includes('universal journal') ||
+        lower.includes('ledger')
+      ) {
+        return `Spot on regarding the Universal Journal (ACDOCA). How does your design ensure multi-ledger financial consistency under high-volume parallel postings?`;
+      }
+      if (question?.probingQuestions && question.probingQuestions.length > 0) {
+        const probe =
+          question.probingQuestions[
+            (this.turnCount - 1) % question.probingQuestions.length
+          ];
+        return `I see. ${probe.probeText}`;
+      }
+      return `Solid architectural breakdown. How does this extension strictly adhere to SAP Clean Core Tier 2 developer extensibility with released C1 APIs when quarterly cloud upgrades occur?`;
+    }
+
+    // General SDE / System Design / DSA
+    if (question?.probingQuestions && question.probingQuestions.length > 0) {
+      const probe =
+        question.probingQuestions[
+          (this.turnCount - 1) % question.probingQuestions.length
+        ];
+      return `That makes sense. ${probe.probeText}`;
+    }
+
+    return `Good point. How would you verify the time and space complexity of this solution under high-throughput production workloads?`;
+  }
+
+  async interrupt(): Promise<void> {
     this.isAssistantSpeaking = false;
     this.emit({ type: 'assistant.interrupted', timestamp: Date.now() });
   }
 
   async close(): Promise<void> {
-    if (this.audioSilenceTimer) {
-      clearTimeout(this.audioSilenceTimer);
-      this.audioSilenceTimer = null;
-    }
-    this.isCandidateSpeaking = false;
     this.isAssistantSpeaking = false;
     this.emit({
       type: 'session.ended',

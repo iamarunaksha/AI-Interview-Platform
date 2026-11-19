@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { interviewSocket } from "@/lib/socket-client";
 import { AudioRecorderPipeline } from "@/lib/audio-recorder";
 import { audioPlayer } from "@/lib/audio-player";
+import { SpeechRecognitionPipeline } from "@/lib/speech-recognition";
 import { InterviewHeader } from "@/components/interview/interview-header";
 import { InterviewStageProgress } from "@/components/interview/interview-stage-progress";
 import { InterviewConceptTracker } from "@/components/interview/interview-concept-tracker";
@@ -38,6 +40,7 @@ interface PageProps {
 }
 
 export default function InterviewRoomPage({ params }: PageProps) {
+  const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [session, setSession] = useState<InterviewSessionResponse | null>(null);
   const [orchestratorState, setOrchestratorState] =
@@ -49,6 +52,12 @@ export default function InterviewRoomPage({ params }: PageProps) {
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [streamingDelta, setStreamingDelta] = useState<string | null>(null);
   const [streamingRole, setStreamingRole] = useState<MessageRole | null>(null);
+  const [interimCandidateSpeech, setInterimCandidateSpeech] = useState<
+    string | null
+  >(null);
+
+  // Examiner / Auditor Mode Toggle (default: false for distraction-free candidate experience)
+  const [examinerMode, setExaminerMode] = useState(false);
 
   // Evidence Collection State
   const [evidence, setEvidence] = useState<EvidenceRecord[]>([]);
@@ -81,6 +90,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
   // Refs for recorders to avoid stale closures
   const recorderRef = useRef<AudioRecorderPipeline | null>(null);
+  const speechRecognizerRef = useRef<SpeechRecognitionPipeline | null>(null);
 
   // Socket event handler
   const handleSocketEvent = React.useCallback((event: ConversationEvent) => {
@@ -271,9 +281,27 @@ export default function InterviewRoomPage({ params }: PageProps) {
   }, [session?.status]);
 
   useEffect(() => {
+    isAssistantSpeakingRef.current = isAssistantSpeaking;
+    speechRecognizerRef.current?.setAssistantSpeaking(isAssistantSpeaking);
+  }, [isAssistantSpeaking]);
+
+  const handleSendText = useCallback((text: string) => {
+    interviewSocket.sendTextMessage(text);
+    setTranscript((prev) => [
+      ...prev,
+      {
+        id: `turn-cnd-${Date.now()}`,
+        role: MessageRole.CANDIDATE,
+        text,
+        timestamp: Date.now(),
+      },
+    ]);
+  }, []);
+
+  useEffect(() => {
     if (!sessionId || !session) return;
 
-    // Instantiate recorder
+    // Instantiate audio recorder for live volume visualizer
     const recorder = new AudioRecorderPipeline({
       onVolumeChange: (vol) => setMicVolume(vol),
       onAudioChunk: (chunk) => {
@@ -283,6 +311,23 @@ export default function InterviewRoomPage({ params }: PageProps) {
       },
     });
     recorderRef.current = recorder;
+
+    // Instantiate native speech recognizer for transcribing candidate's actual voice
+    const recognizer = new SpeechRecognitionPipeline({
+      onInterimTranscript: (text) => {
+        setInterimCandidateSpeech(text);
+      },
+      onFinalTranscript: (text) => {
+        setInterimCandidateSpeech(null);
+        if (text.trim()) {
+          handleSendText(text.trim());
+        }
+      },
+      onError: (err) => {
+        console.warn("Speech recognition notice:", err);
+      },
+    });
+    speechRecognizerRef.current = recognizer;
 
     // Connect to WebSocket gateway
     interviewSocket.connect(sessionId, {
@@ -295,7 +340,10 @@ export default function InterviewRoomPage({ params }: PageProps) {
         ) {
           recorder
             .start()
-            .then(() => setIsMicActive(true))
+            .then(() => {
+              setIsMicActive(true);
+              recognizer.start();
+            })
             .catch(() => {
               // User can manually click Unmute Mic
             });
@@ -324,6 +372,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
     });
 
     return () => {
+      recognizer.stop();
       recorder.stop();
       audioPlayer.stopAll();
       interviewSocket.disconnect();
@@ -336,10 +385,13 @@ export default function InterviewRoomPage({ params }: PageProps) {
     if (!recorderRef.current) return;
     if (isMicActive) {
       recorderRef.current.stop();
+      speechRecognizerRef.current?.stop();
       setIsMicActive(false);
+      setInterimCandidateSpeech(null);
     } else {
       try {
         await recorderRef.current.start();
+        speechRecognizerRef.current?.start();
         setIsMicActive(true);
       } catch (err) {
         alert(
@@ -367,19 +419,6 @@ export default function InterviewRoomPage({ params }: PageProps) {
   const handleTogglePause = () => {
     interviewSocket.pause();
     setIsPaused(!isPaused);
-  };
-
-  const handleSendText = (text: string) => {
-    interviewSocket.sendTextMessage(text);
-    setTranscript((prev) => [
-      ...prev,
-      {
-        id: `turn-cnd-${Date.now()}`,
-        role: MessageRole.CANDIDATE,
-        text,
-        timestamp: Date.now(),
-      },
-    ]);
   };
 
   const handleCodeChange = (code: string, language: ProgrammingLanguage) => {
@@ -419,6 +458,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
       setSession((prev) =>
         prev ? { ...prev, status: InterviewStatus.COMPLETED } : null,
       );
+      router.push(`/interview/${sessionId}/report`);
     } catch (err) {
       console.error("Failed to end interview:", err);
     }
@@ -497,6 +537,8 @@ export default function InterviewRoomPage({ params }: PageProps) {
         status={session.status}
         startedAt={session.startedAt}
         onEndInterview={handleEndInterview}
+        examinerMode={examinerMode}
+        onToggleExaminerMode={() => setExaminerMode(!examinerMode)}
       />
 
       {/* Stage Progression Stepper */}
@@ -655,6 +697,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 transcript={transcript}
                 streamingDelta={streamingDelta}
                 streamingRole={streamingRole}
+                interimCandidateSpeech={interimCandidateSpeech}
               />
 
               <InterviewControls
@@ -669,11 +712,13 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 onSendText={handleSendText}
               />
 
-              <InterviewEvidencePanel
-                evidence={evidence}
-                onBatchExtract={handleBatchExtract}
-                isExtracting={isExtractingEvidence}
-              />
+              {examinerMode && (
+                <InterviewEvidencePanel
+                  evidence={evidence}
+                  onBatchExtract={handleBatchExtract}
+                  isExtracting={isExtractingEvidence}
+                />
+              )}
             </div>
           </div>
         )}
@@ -730,6 +775,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                   transcript={transcript}
                   streamingDelta={streamingDelta}
                   streamingRole={streamingRole}
+                  interimCandidateSpeech={interimCandidateSpeech}
                 />
                 <InterviewControls
                   isMicActive={isMicActive}
@@ -742,11 +788,13 @@ export default function InterviewRoomPage({ params }: PageProps) {
                   onTogglePause={handleTogglePause}
                   onSendText={handleSendText}
                 />
-                <InterviewEvidencePanel
-                  evidence={evidence}
-                  onBatchExtract={handleBatchExtract}
-                  isExtracting={isExtractingEvidence}
-                />
+                {examinerMode && (
+                  <InterviewEvidencePanel
+                    evidence={evidence}
+                    onBatchExtract={handleBatchExtract}
+                    isExtracting={isExtractingEvidence}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -843,26 +891,31 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 transcript={transcript}
                 streamingDelta={streamingDelta}
                 streamingRole={streamingRole}
+                interimCandidateSpeech={interimCandidateSpeech}
               />
 
-              <InterviewEvidencePanel
-                evidence={evidence}
-                onBatchExtract={handleBatchExtract}
-                isExtracting={isExtractingEvidence}
-              />
+              {examinerMode && (
+                <InterviewEvidencePanel
+                  evidence={evidence}
+                  onBatchExtract={handleBatchExtract}
+                  isExtracting={isExtractingEvidence}
+                />
+              )}
             </div>
           </div>
         )}
 
-        {/* Full-Width Bottom Section: Independent Rubric Evaluation */}
-        <div className="w-full">
-          <InterviewEvaluationCard
-            report={evaluationReport}
-            isEvaluating={isEvaluating}
-            onEvaluate={handleEvaluate}
-            isSessionConcluded={session.status === InterviewStatus.COMPLETED}
-          />
-        </div>
+        {/* Full-Width Bottom Section: Independent Rubric Evaluation (Only in Examiner Mode or when Concluded) */}
+        {(examinerMode || session.status === InterviewStatus.COMPLETED) && (
+          <div className="w-full">
+            <InterviewEvaluationCard
+              report={evaluationReport}
+              isEvaluating={isEvaluating}
+              onEvaluate={handleEvaluate}
+              isSessionConcluded={session.status === InterviewStatus.COMPLETED}
+            />
+          </div>
+        )}
       </main>
     </div>
   );

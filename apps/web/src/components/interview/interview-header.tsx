@@ -13,6 +13,8 @@ interface InterviewHeaderProps {
   status: InterviewStatus;
   startedAt?: string | null;
   onEndInterview: () => void;
+  examinerMode?: boolean;
+  onToggleExaminerMode?: () => void;
 }
 
 export function InterviewHeader({
@@ -22,6 +24,8 @@ export function InterviewHeader({
   status,
   startedAt,
   onEndInterview,
+  examinerMode = false,
+  onToggleExaminerMode,
 }: InterviewHeaderProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -130,6 +134,21 @@ export function InterviewHeader({
           </svg>
           <span>{formatTimer(elapsedSeconds)}</span>
         </div>
+
+        {/* Examiner mode toggle (hidden by default for candidates) */}
+        {onToggleExaminerMode && (
+          <button
+            onClick={onToggleExaminerMode}
+            className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
+              examinerMode
+                ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                : "bg-zinc-900 text-zinc-500 hover:text-zinc-400 border-zinc-800"
+            }`}
+            title="Toggle Examiner Evaluation & Evidence Ledger"
+          >
+            {examinerMode ? "Examiner Mode: ON" : "Examiner Mode"}
+          </button>
+        )}
 
         {/* End interview button */}
         {status !== InterviewStatus.COMPLETED && (

@@ -93,7 +93,13 @@ export class VideoStreamPipeline {
 
     try {
       this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.videoElement.muted = true;
+      this.videoElement.defaultMuted = true;
+      this.videoElement.playsInline = true;
       this.videoElement.srcObject = this.stream;
+      this.videoElement.onloadedmetadata = () => {
+        this.videoElement?.play().catch(() => {});
+      };
       await this.videoElement.play().catch(() => {
         // Autoplay may need user gesture
       });
@@ -114,9 +120,15 @@ export class VideoStreamPipeline {
   attach(videoEl: HTMLVideoElement): void {
     this.videoElement = videoEl;
     if (this.stream) {
+      videoEl.muted = true;
+      videoEl.defaultMuted = true;
+      videoEl.playsInline = true;
       if (videoEl.srcObject !== this.stream) {
         videoEl.srcObject = this.stream;
       }
+      videoEl.onloadedmetadata = () => {
+        videoEl.play().catch(() => {});
+      };
       videoEl.play().catch(() => {
         // Autoplay may need user gesture
       });

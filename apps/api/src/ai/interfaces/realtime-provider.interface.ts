@@ -5,6 +5,8 @@ export interface RealtimeSessionConfig {
   systemInstruction: string;
   voiceName?: string;
   sampleRate?: number;
+  session?: any;
+  llmProvider?: any;
 }
 
 export interface IRealtimeSession {

@@ -156,6 +156,7 @@ describe('InterviewService', () => {
       getActiveRealtimeProvider: vi
         .fn()
         .mockReturnValue(mockRealtimeProvider as IRealtimeVoiceProvider),
+      getActiveLlmProvider: vi.fn().mockReturnValue(null),
     };
 
     const contextInjector = new ContextInjectorService();

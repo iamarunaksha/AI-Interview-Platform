@@ -283,10 +283,52 @@ export class InterviewService implements OnModuleDestroy {
     });
 
     const provider = this.providerRegistry.getActiveRealtimeProvider();
+    const llmProvider = this.providerRegistry.getActiveLlmProvider();
     const realtimeSession = await provider.createSession({
       sessionId,
       systemInstruction,
+      session,
+      llmProvider,
     });
+
+    // If newly joined session with no prior assistant greeting, deliver initial greeting
+    const existingAssistantTurns = (session.transcript || []).filter(
+      (t) => t.role === MessageRole.ASSISTANT,
+    );
+    if (existingAssistantTurns.length === 0) {
+      const isSap =
+        session.domain === ProfessionalDomain.SAP ||
+        session.currentQuestion?.domain === ProfessionalDomain.SAP;
+
+      const greetingText = isSap
+        ? `Hello! Welcome to your technical interview today. My name is Alex, your AI technical interviewer. Today we will be exploring enterprise SAP architecture, Clean Core strategy, and module integration for the role of ${session.targetRole}. How are you doing today? Whenever you are ready, let me know and we will begin.`
+        : `Hello! Welcome to your technical interview today. My name is Alex, your AI technical interviewer. Today we'll be working through a problem in ${
+            session.currentQuestion?.competency?.slug?.includes('dsa') ||
+            session.currentQuestion?.title?.toLowerCase().includes('cache') ||
+            session.currentQuestion?.title?.toLowerCase().includes('lru')
+              ? 'Data Structures & Algorithms'
+              : 'System Architecture & Engineering'
+          }: "${session.currentQuestion?.title || 'Technical Problem'}". How are you doing today? Whenever you're ready, let me know and we'll dive in.`;
+
+      setTimeout(() => {
+        const turn = {
+          id: `turn-ast-${Date.now()}`,
+          role: MessageRole.ASSISTANT,
+          text: greetingText,
+          timestamp: Date.now(),
+        };
+        void this.appendTranscriptTurn(sessionId, turn);
+        onEvent({
+          type: 'assistant.transcript.final',
+          text: greetingText,
+          timestamp: Date.now(),
+        });
+        onEvent({
+          type: 'turn.completed',
+          timestamp: Date.now(),
+        });
+      }, 500);
+    }
 
     // Wire internal transcript recording and orchestrator progression
     realtimeSession.onEvent((event: ConversationEvent) => {

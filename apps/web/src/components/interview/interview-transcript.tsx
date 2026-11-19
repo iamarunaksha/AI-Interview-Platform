@@ -7,12 +7,14 @@ interface InterviewTranscriptProps {
   transcript: TranscriptTurn[];
   streamingDelta?: string | null;
   streamingRole?: MessageRole | null;
+  interimCandidateSpeech?: string | null;
 }
 
 export function InterviewTranscript({
   transcript,
   streamingDelta,
   streamingRole,
+  interimCandidateSpeech,
 }: InterviewTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -20,7 +22,7 @@ export function InterviewTranscript({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [transcript, streamingDelta]);
+  }, [transcript, streamingDelta, interimCandidateSpeech]);
 
   return (
     <div className="flex flex-col h-[400px] bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
@@ -115,6 +117,21 @@ export function InterviewTranscript({
             </div>
             <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed bg-zinc-800/90 text-zinc-200 border border-indigo-500/40 rounded-tl-sm animate-pulse">
               {streamingDelta}
+            </div>
+          </div>
+        )}
+
+        {/* Live Candidate Speech Recognition Preview */}
+        {interimCandidateSpeech && (
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-2 mb-1 px-1">
+              <span className="text-[11px] font-semibold uppercase text-emerald-400 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                You (Speaking...)
+              </span>
+            </div>
+            <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed bg-emerald-600/20 text-emerald-100 border border-emerald-500/40 rounded-tr-sm italic">
+              {interimCandidateSpeech}
             </div>
           </div>
         )}

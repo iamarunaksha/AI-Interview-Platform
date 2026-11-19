@@ -91,6 +91,17 @@ export function InterviewControls({
             )}
           </button>
 
+          {isMicActive ? (
+            <span className="text-[11px] text-emerald-400 font-medium hidden sm:inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Voice listening active</span>
+            </span>
+          ) : (
+            <span className="text-[11px] text-zinc-500 hidden sm:inline-flex items-center gap-1.5 px-2 py-1">
+              <span>Mic muted</span>
+            </span>
+          )}
+
           {/* Interrupt Assistant button */}
           {isAssistantSpeaking && (
             <button
