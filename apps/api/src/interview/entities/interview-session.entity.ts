@@ -111,6 +111,7 @@ export class InterviewSessionEntity {
   })
   coveredConcepts: string[];
 
+  @Index()
   @Column({ type: 'uuid', nullable: true })
   currentQuestionId: string | null;
 

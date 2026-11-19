@@ -8,18 +8,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
+        const databaseUrl = config.get<string>('DATABASE_URL');
         const isSsl = config.get<string>('DATABASE_SSL') === 'true';
         const isProd = config.get<string>('NODE_ENV') === 'production';
         const syncEnabled =
           !isProd && config.get<string>('DB_SYNCHRONIZE', 'true') === 'true';
 
-        return {
-          type: 'postgres',
-          host: config.get<string>('DATABASE_HOST', 'localhost'),
-          port: Number(config.get<number>('DATABASE_PORT', 5432)),
-          username: config.get<string>('DATABASE_USER', 'postgres'),
-          password: config.get<string>('DATABASE_PASSWORD', ''),
-          database: config.get<string>('DATABASE_NAME', 'postgres'),
+        const baseConfig = {
+          type: 'postgres' as const,
           ssl: isSsl ? { rejectUnauthorized: false } : false,
           autoLoadEntities: true,
           synchronize: syncEnabled,
@@ -29,6 +25,22 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
               config.get<number>('DATABASE_TIMEOUT', 10000),
             ),
           },
+        };
+
+        if (databaseUrl) {
+          return {
+            ...baseConfig,
+            url: databaseUrl,
+          };
+        }
+
+        return {
+          ...baseConfig,
+          host: config.get<string>('DATABASE_HOST', 'localhost'),
+          port: Number(config.get<number>('DATABASE_PORT', 5432)),
+          username: config.get<string>('DATABASE_USER', 'postgres'),
+          password: config.get<string>('DATABASE_PASSWORD', ''),
+          database: config.get<string>('DATABASE_NAME', 'postgres'),
         };
       },
     }),

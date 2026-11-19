@@ -23,11 +23,21 @@ async function bootstrap() {
     }),
   );
 
-  // Enable CORS for frontend requests
+  // Enable CORS for frontend requests (supports single or comma-separated origins)
+  const rawCors =
+    process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://127.0.0.1:3000';
+  const corsOrigins = rawCors.split(',').map((o) => o.trim());
+
   app.enableCors({
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,
   });
+
+  // Enable trust proxy for reverse proxy deployments (Cloudflare / ALB / Nginx)
+  const httpAdapter = app.getHttpAdapter().getInstance();
+  if (httpAdapter && typeof httpAdapter.set === 'function') {
+    httpAdapter.set('trust proxy', 1);
+  }
 
   // Defense-in-depth: Enterprise security headers
   app.use((_req: unknown, res: any, next: () => void) => {

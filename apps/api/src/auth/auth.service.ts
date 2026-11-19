@@ -37,6 +37,10 @@ export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
   private readonly bcryptRounds = 12;
 
+  // Pre-computed constant bcrypt hash (cost 12) for constant-time comparison on user not found
+  private readonly DUMMY_HASH =
+    '$2b$12$e8/6z5e3fHwVpP8w3X3n1.X4vW8K7Z0L.O2vW9Z8K7Y0L.O2vW9Z8';
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -94,6 +98,8 @@ export class AuthService implements OnModuleInit {
     const user = await this.usersService.findByEmail(email);
 
     if (!user) {
+      // Execute constant-time bcrypt compare to prevent timing-based user enumeration
+      await bcrypt.compare(password, this.DUMMY_HASH).catch(() => false);
       throw new UnauthorizedException('Invalid credentials');
     }
 

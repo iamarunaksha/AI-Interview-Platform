@@ -34,6 +34,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 const ACCESS_TOKEN_KEY = "interviewai_access_token";
 const REFRESH_TOKEN_KEY = "interviewai_refresh_token";
 
+// In-flight refresh promise singleton to prevent 401 refresh stampedes
+let activeRefreshPromise: Promise<string | null> | null = null;
+
 export function getStoredAccessToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -52,6 +55,45 @@ export function clearStoredTokens(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+async function refreshAccessTokenDeduped(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!refreshToken) return null;
+
+  if (activeRefreshPromise) {
+    return activeRefreshPromise;
+  }
+
+  activeRefreshPromise = (async () => {
+    try {
+      const refreshRes = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!refreshRes.ok) {
+        clearStoredTokens();
+        return null;
+      }
+
+      const data = (await refreshRes.json()) as { accessToken: string };
+      if (data?.accessToken) {
+        localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+        return data.accessToken;
+      }
+      return null;
+    } catch {
+      clearStoredTokens();
+      return null;
+    } finally {
+      activeRefreshPromise = null;
+    }
+  })();
+
+  return activeRefreshPromise;
 }
 
 async function apiFetch<T>(
@@ -74,39 +116,15 @@ async function apiFetch<T>(
     headers,
   });
 
-  // Enterprise token refresh: on 401 unauthorized, attempt refresh once if refresh token is present
+  // Enterprise token refresh: on 401 unauthorized, await deduplicated refresh promise
   if (res.status === 401 && !endpoint.includes("/auth/")) {
-    const refreshToken =
-      typeof window !== "undefined"
-        ? localStorage.getItem(REFRESH_TOKEN_KEY)
-        : null;
-
-    if (refreshToken) {
-      try {
-        const refreshRes = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refreshToken }),
-        });
-
-        if (refreshRes.ok) {
-          const data = (await refreshRes.json()) as { accessToken: string };
-          if (data.accessToken) {
-            if (typeof window !== "undefined") {
-              localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-            }
-            headers.set("Authorization", `Bearer ${data.accessToken}`);
-            res = await fetch(`${API_BASE_URL}${endpoint}`, {
-              ...options,
-              headers,
-            });
-          }
-        } else {
-          clearStoredTokens();
-        }
-      } catch {
-        clearStoredTokens();
-      }
+    const newToken = await refreshAccessTokenDeduped();
+    if (newToken) {
+      headers.set("Authorization", `Bearer ${newToken}`);
+      res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
     }
   }
 

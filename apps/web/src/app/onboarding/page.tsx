@@ -713,6 +713,20 @@ function Step7HardwarePreview() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
+  // Callback ref: ensures stream is attached immediately whenever the video DOM node mounts or remounts
+  const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    if (node && streamRef.current) {
+      node.muted = true;
+      node.defaultMuted = true;
+      node.playsInline = true;
+      if (node.srcObject !== streamRef.current) {
+        node.srcObject = streamRef.current;
+      }
+      node.play().catch(() => {});
+    }
+  }, []);
+
   const stopHardwareCheck = useCallback(() => {
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
@@ -858,7 +872,7 @@ function Step7HardwarePreview() {
       {/* Video Viewport Container */}
       <div className="relative w-full h-48 bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 flex items-center justify-center">
         <video
-          ref={videoRef}
+          ref={setVideoRef}
           autoPlay
           playsInline
           muted

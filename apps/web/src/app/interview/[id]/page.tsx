@@ -108,7 +108,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
         setTranscript((prev) => [
           ...prev,
           {
-            id: `turn-cnd-${Date.now()}`,
+            id: `turn-cnd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             role: MessageRole.CANDIDATE,
             text: event.text,
             timestamp: event.timestamp,
@@ -142,7 +142,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
           return [
             ...prev,
             {
-              id: `turn-ast-${Date.now()}`,
+              id: `turn-ast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
               role: MessageRole.ASSISTANT,
               text: event.text,
               timestamp: event.timestamp,
@@ -313,7 +313,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
     setTranscript((prev) => [
       ...prev,
       {
-        id: `turn-cnd-${Date.now()}`,
+        id: `turn-cnd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         role: MessageRole.CANDIDATE,
         text,
         timestamp: Date.now(),

@@ -70,11 +70,14 @@ export class RateLimitGuard implements CanActivate, OnModuleDestroy {
     const now = Date.now();
     const windowMs = options.ttlSeconds * 1000;
 
-    // Identify client by authenticated user ID or client IP
+    // Identify client securely: authenticated user ID, or trusted IP, or socket remote address
+    const userObj = (req as { user?: { id?: string } }).user;
     const clientId =
-      (req as any).user?.id ||
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      userObj?.id ||
+      req.ip ||
       req.socket?.remoteAddress ||
+      (req.headers &&
+        (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()) ||
       'unknown-client';
 
     const handlerName = context.getHandler().name;

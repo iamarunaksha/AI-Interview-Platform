@@ -21,7 +21,11 @@ import type {
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: (
+      process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000'
+    )
+      .split(',')
+      .map((item) => item.trim()),
     credentials: true,
   },
   namespace: '/interview',
@@ -134,18 +138,39 @@ export class InterviewGateway
         return;
       }
 
-      // If user is authenticated and session belongs to a candidate, verify ownership
-      if (user && session.candidateId && session.candidateId !== user.id) {
-        this.logger.warn(
-          `Unauthorized join attempt: User ${user.id} tried to join session ${sessionId} owned by ${session.candidateId}`,
-        );
-        client.emit('session.error', {
-          type: 'session.error',
-          code: 'UNAUTHORIZED_SESSION_ACCESS',
-          message: 'You are not authorized to join this interview session',
-          timestamp: Date.now(),
-        });
-        return;
+      // 3. Enforce ownership and prevent unauthorized session hijacking (BOLA)
+      if (session.candidateId) {
+        if (user && session.candidateId !== user.id) {
+          this.logger.warn(
+            `Unauthorized join attempt: User ${user.id} tried to join session ${sessionId} owned by ${session.candidateId}`,
+          );
+          client.emit('session.error', {
+            type: 'session.error',
+            code: 'UNAUTHORIZED_SESSION_ACCESS',
+            message: 'You are not authorized to join this interview session',
+            timestamp: Date.now(),
+          });
+          return;
+        }
+
+        // In production, require authentication for candidate-owned sessions
+        if (
+          !user &&
+          this.authService &&
+          process.env.NODE_ENV === 'production'
+        ) {
+          this.logger.warn(
+            `Unauthenticated join attempt blocked for candidate session ${sessionId}`,
+          );
+          client.emit('session.error', {
+            type: 'session.error',
+            code: 'UNAUTHENTICATED',
+            message:
+              'A valid authentication token is required to join this interview session.',
+            timestamp: Date.now(),
+          });
+          return;
+        }
       }
 
       await client.join(sessionId);

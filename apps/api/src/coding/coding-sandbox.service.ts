@@ -17,6 +17,8 @@ export class CodingSandboxService {
   private readonly EXECUTION_TIMEOUT_MS = 2500;
   // Maximum stdout capture size per execution (bytes)
   private readonly MAX_OUTPUT_BYTES = 16 * 1024;
+  // Strict regex for safe programming identifiers to prevent injection
+  private readonly SAFE_IDENTIFIER_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
 
   /**
    * Execute code in an isolated, secure sandbox against test cases.
@@ -32,6 +34,23 @@ export class CodingSandboxService {
     this.logger.log(
       `Executing ${language} code against ${testCases.length} test cases (Entry: ${entryFunction || 'auto'})`,
     );
+
+    // Validate entry function identifier if explicitly supplied
+    if (entryFunction && !this.SAFE_IDENTIFIER_REGEX.test(entryFunction)) {
+      this.logger.warn(
+        `Sandbox execution rejected: Malicious entry function identifier "${entryFunction}"`,
+      );
+      return {
+        language,
+        status: CodeExecutionStatus.COMPILE_ERROR,
+        totalTests: testCases.length,
+        passedTests: 0,
+        runtimeMs: 0,
+        results: [],
+        compilerOutput: `Security violation: Invalid entry function identifier "${entryFunction}".`,
+        interviewerContextNote: `Candidate provided an invalid or malicious function identifier.`,
+      };
+    }
 
     const securityError = this.validateCodeSafety(code, language);
     if (securityError) {
@@ -189,7 +208,10 @@ export class CodingSandboxService {
       }
     }
 
-    if (!resolvedEntryFunction) {
+    if (
+      !resolvedEntryFunction ||
+      !this.SAFE_IDENTIFIER_REGEX.test(resolvedEntryFunction)
+    ) {
       return {
         language: ProgrammingLanguage.TYPESCRIPT,
         status: CodeExecutionStatus.COMPILE_ERROR,
@@ -214,15 +236,20 @@ export class CodingSandboxService {
       try {
         // Pass test case input safely via context variable
         (context as Record<string, unknown>).__current_input__ = tc.input;
+        (context as Record<string, unknown>).__entry_fn_name__ =
+          resolvedEntryFunction;
 
+        // Use bracket lookup on sandbox context instead of direct string interpolation
         const harnessScript = new vm.Script(
           `
           (() => {
+            const fn = this[__entry_fn_name__];
+            if (typeof fn !== 'function') throw new Error(__entry_fn_name__ + ' is not a function');
             const input = __current_input__;
             if (Array.isArray(input)) {
-              return ${resolvedEntryFunction}(...input);
+              return fn(...input);
             } else {
-              return ${resolvedEntryFunction}(input);
+              return fn(input);
             }
           })()
           `,
