@@ -5,7 +5,6 @@ import {
   ExperienceLevel,
   InterviewerPersonality,
 } from "@interviewai/shared-types";
-import { SystemHealthIndicator } from "@/components/system-health-indicator";
 
 export default function Home() {
   const domains = [
@@ -62,11 +61,6 @@ export default function Home() {
           >
             Create Free Account
           </Link>
-        </div>
-
-        {/* Live Client Health Checker Component */}
-        <div className="mt-10">
-          <SystemHealthIndicator />
         </div>
 
         {/* Domain Cards */}

@@ -63,16 +63,57 @@ export function InterviewVideoContainer({
         </div>
       )}
 
-      {/* Dynamic Layout Rendering based on VideoLayoutMode */}
-      {layoutMode === VideoLayoutMode.GRID && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Unified Persistent Container - Video Feed NEVER Unmounts on Layout Switch */}
+      <div
+        className={
+          layoutMode === VideoLayoutMode.PIP
+            ? "relative"
+            : layoutMode === VideoLayoutMode.GRID
+              ? "grid grid-cols-1 md:grid-cols-2 gap-4"
+              : layoutMode === VideoLayoutMode.SPEAKER
+                ? "grid grid-cols-1 md:grid-cols-12 gap-4"
+                : "flex flex-col gap-4"
+        }
+      >
+        <div
+          className={
+            layoutMode === VideoLayoutMode.PIP
+              ? "w-full"
+              : layoutMode === VideoLayoutMode.SPEAKER
+                ? `transition-all ${
+                    isAssistantSpeaking
+                      ? "md:col-span-8 order-1"
+                      : "md:col-span-4 order-2"
+                  }`
+                : ""
+          }
+        >
           <InterviewAiAvatar
             isAssistantSpeaking={isAssistantSpeaking}
             stage={stage}
             personality={personality}
             companyCategory={companyCategory}
             targetRole={targetRole}
+            isCompact={
+              layoutMode === VideoLayoutMode.SIDEBAR ||
+              (layoutMode === VideoLayoutMode.SPEAKER && !isAssistantSpeaking)
+            }
           />
+        </div>
+
+        <div
+          className={
+            layoutMode === VideoLayoutMode.PIP
+              ? "absolute bottom-4 right-4 z-20 w-56 sm:w-64 shadow-2xl rounded-2xl overflow-hidden border-2 border-indigo-500/60 transition-transform transform hover:scale-105"
+              : layoutMode === VideoLayoutMode.SPEAKER
+                ? `transition-all ${
+                    !isAssistantSpeaking
+                      ? "md:col-span-8 order-1"
+                      : "md:col-span-4 order-2"
+                  }`
+                : ""
+          }
+        >
           <InterviewVideoFeed
             isCameraActive={isCameraActive}
             onToggleCamera={onToggleCamera}
@@ -80,97 +121,14 @@ export function InterviewVideoContainer({
             onChangeLayoutMode={onChangeLayoutMode}
             onMetricsUpdate={onMetricsUpdate}
             candidateName={candidateName}
+            isCompact={
+              layoutMode === VideoLayoutMode.PIP ||
+              layoutMode === VideoLayoutMode.SIDEBAR ||
+              (layoutMode === VideoLayoutMode.SPEAKER && isAssistantSpeaking)
+            }
           />
         </div>
-      )}
-
-      {layoutMode === VideoLayoutMode.PIP && (
-        <div className="relative">
-          {/* Main Full View: AI Interviewer */}
-          <InterviewAiAvatar
-            isAssistantSpeaking={isAssistantSpeaking}
-            stage={stage}
-            personality={personality}
-            companyCategory={companyCategory}
-            targetRole={targetRole}
-          />
-
-          {/* Floating Picture-in-Picture Candidate Card */}
-          <div className="absolute bottom-4 right-4 z-20 w-56 sm:w-64 shadow-2xl rounded-2xl overflow-hidden border-2 border-indigo-500/60 transition-transform transform hover:scale-105">
-            <InterviewVideoFeed
-              isCameraActive={isCameraActive}
-              onToggleCamera={onToggleCamera}
-              layoutMode={layoutMode}
-              onChangeLayoutMode={onChangeLayoutMode}
-              onMetricsUpdate={onMetricsUpdate}
-              candidateName={candidateName}
-              isCompact={true}
-            />
-          </div>
-        </div>
-      )}
-
-      {layoutMode === VideoLayoutMode.SPEAKER && (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          {/* Primary View: Active Speaker Gets 8 cols, Passive gets 4 cols */}
-          <div
-            className={`transition-all ${
-              isAssistantSpeaking
-                ? "md:col-span-8 order-1"
-                : "md:col-span-4 order-2"
-            }`}
-          >
-            <InterviewAiAvatar
-              isAssistantSpeaking={isAssistantSpeaking}
-              stage={stage}
-              personality={personality}
-              companyCategory={companyCategory}
-              targetRole={targetRole}
-              isCompact={!isAssistantSpeaking}
-            />
-          </div>
-
-          <div
-            className={`transition-all ${
-              !isAssistantSpeaking
-                ? "md:col-span-8 order-1"
-                : "md:col-span-4 order-2"
-            }`}
-          >
-            <InterviewVideoFeed
-              isCameraActive={isCameraActive}
-              onToggleCamera={onToggleCamera}
-              layoutMode={layoutMode}
-              onChangeLayoutMode={onChangeLayoutMode}
-              onMetricsUpdate={onMetricsUpdate}
-              candidateName={candidateName}
-              isCompact={isAssistantSpeaking}
-            />
-          </div>
-        </div>
-      )}
-
-      {layoutMode === VideoLayoutMode.SIDEBAR && (
-        <div className="flex flex-col gap-4">
-          <InterviewAiAvatar
-            isAssistantSpeaking={isAssistantSpeaking}
-            stage={stage}
-            personality={personality}
-            companyCategory={companyCategory}
-            targetRole={targetRole}
-            isCompact={true}
-          />
-          <InterviewVideoFeed
-            isCameraActive={isCameraActive}
-            onToggleCamera={onToggleCamera}
-            layoutMode={layoutMode}
-            onChangeLayoutMode={onChangeLayoutMode}
-            onMetricsUpdate={onMetricsUpdate}
-            candidateName={candidateName}
-            isCompact={true}
-          />
-        </div>
-      )}
+      </div>
     </div>
   );
 }

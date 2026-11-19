@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/auth-context";
 import {
@@ -75,11 +75,6 @@ function OnboardingWizard({
     initialProfile?.preferredMode ?? InterviewMode.PRACTICE,
   );
 
-  // Media preview state
-  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
-  const [mediaError, setMediaError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   // Adjust defaults when domain changes
   const handleDomainChange = (newDomain: ProfessionalDomain) => {
     setDomain(newDomain);
@@ -89,40 +84,6 @@ function OnboardingWizard({
     } else {
       setCompanyCategory(CompanyCategory.FAANG_STYLE);
       setTargetRole("Backend Engineer");
-    }
-  };
-
-  // Hardware check cleanup
-  useEffect(() => {
-    return () => {
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [mediaStream]);
-
-  const startMediaCheck = async () => {
-    setMediaError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-      setMediaStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch {
-      setMediaError(
-        "Camera/Microphone permission denied or not found. You can still test, but permissions are needed for actual voice/video interviews.",
-      );
-    }
-  };
-
-  const stopMediaCheck = () => {
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => track.stop());
-      setMediaStream(null);
     }
   };
 
@@ -143,7 +104,6 @@ function OnboardingWizard({
           preferredMode: mode,
         });
       }
-      stopMediaCheck();
       router.push("/dashboard");
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -663,43 +623,7 @@ function OnboardingWizard({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Media Preview Box */}
-                <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center min-h-[200px]">
-                  {mediaStream ? (
-                    <div className="w-full flex flex-col items-center">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-44 object-cover rounded-lg bg-black"
-                      />
-                      <div className="mt-3 flex items-center gap-2 text-xs text-green-600 dark:text-green-400 font-medium">
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        Camera & Microphone Active
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4">
-                      <div className="text-3xl mb-2">🎙️ 📹</div>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-                        Click below to verify microphone & camera access.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={startMediaCheck}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm"
-                      >
-                        Test Camera & Mic
-                      </button>
-                    </div>
-                  )}
-
-                  {mediaError && (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400 text-center mt-2 px-2">
-                      {mediaError}
-                    </p>
-                  )}
-                </div>
+                <Step7HardwarePreview />
 
                 {/* Track Summary */}
                 <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50 dark:bg-zinc-950 text-xs space-y-2.5">
@@ -776,6 +700,120 @@ function OnboardingWizard({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function Step7HardwarePreview() {
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Callback ref to attach stream immediately upon mounting
+  const setVideoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      videoRef.current = el;
+      if (el && mediaStream) {
+        if (el.srcObject !== mediaStream) {
+          el.srcObject = mediaStream;
+        }
+        el.play().catch(() => {});
+      }
+    },
+    [mediaStream],
+  );
+
+  // Auto-attach if stream changes while mounted
+  useEffect(() => {
+    if (mediaStream && videoRef.current) {
+      if (videoRef.current.srcObject !== mediaStream) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      videoRef.current.play().catch(() => {});
+    }
+  }, [mediaStream]);
+
+  // Clean up and release hardware when Step 7 unmounts
+  useEffect(() => {
+    return () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [mediaStream]);
+
+  const startMediaCheck = async () => {
+    setMediaError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      setMediaStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+    } catch {
+      setMediaError(
+        "Camera/Microphone permission denied or not found. You can still test, but permissions are needed for actual voice/video interviews.",
+      );
+    }
+  };
+
+  const stopMediaCheck = () => {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+      setMediaStream(null);
+    }
+  };
+
+  return (
+    <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center min-h-[200px]">
+      {mediaStream ? (
+        <div className="w-full flex flex-col items-center">
+          <video
+            ref={setVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-44 object-cover rounded-lg bg-black -scale-x-100"
+          />
+          <div className="mt-3 w-full flex items-center justify-between text-xs text-green-600 dark:text-green-400 font-medium">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span>Camera &amp; Microphone Active</span>
+            </div>
+            <button
+              type="button"
+              onClick={stopMediaCheck}
+              className="text-[11px] text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 underline font-normal transition-colors"
+            >
+              Turn Off Camera
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-4">
+          <div className="text-3xl mb-2">🎙️ 📹</div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+            Click below to verify microphone &amp; camera access.
+          </p>
+          <button
+            type="button"
+            onClick={startMediaCheck}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+          >
+            Test Camera &amp; Mic
+          </button>
+        </div>
+      )}
+
+      {mediaError && (
+        <p className="text-[11px] text-amber-600 dark:text-amber-400 text-center mt-2 px-2">
+          {mediaError}
+        </p>
+      )}
     </div>
   );
 }

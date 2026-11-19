@@ -115,7 +115,7 @@ export default function TracksPage() {
           <div className="flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400 mb-1">
             <span>⚡ Enterprise SAP Architecture &amp; Clean Core Tracks</span>
             <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-[10px]">
-              Phase 12 Specialization
+              Enterprise Specialization
             </span>
           </div>
           <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">

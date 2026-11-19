@@ -59,6 +59,18 @@ export class VideoStreamPipeline {
   async start(videoEl: HTMLVideoElement): Promise<MediaStream> {
     this.videoElement = videoEl;
 
+    // If stream is already live, attach without re-requesting getUserMedia
+    if (
+      this.stream &&
+      this.stream.getVideoTracks().some((t) => t.readyState === "live")
+    ) {
+      this.attach(videoEl);
+      if (!this.metricsTimer) {
+        this.startMetricsEvaluation();
+      }
+      return this.stream;
+    }
+
     if (
       typeof navigator === "undefined" ||
       !navigator.mediaDevices?.getUserMedia
@@ -93,6 +105,21 @@ export class VideoStreamPipeline {
         err instanceof Error ? err : new Error("Failed to access camera");
       this.config.onError?.(error);
       throw error;
+    }
+  }
+
+  /**
+   * Re-attach the active stream to an HTMLVideoElement.
+   */
+  attach(videoEl: HTMLVideoElement): void {
+    this.videoElement = videoEl;
+    if (this.stream) {
+      if (videoEl.srcObject !== this.stream) {
+        videoEl.srcObject = this.stream;
+      }
+      videoEl.play().catch(() => {
+        // Autoplay may need user gesture
+      });
     }
   }
 

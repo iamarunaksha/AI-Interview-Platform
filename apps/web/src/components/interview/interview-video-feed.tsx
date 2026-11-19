@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   type CameraDevice,
   type VideoQualityMetrics,
@@ -30,6 +30,14 @@ export function InterviewVideoFeed({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const pipelineRef = useRef<VideoStreamPipeline | null>(null);
 
+  // Callback ref to attach stream immediately upon mounting/remounting
+  const setVideoRef = useCallback((el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && pipelineRef.current) {
+      pipelineRef.current.attach(el);
+    }
+  }, []);
+
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [isMirrored, setIsMirrored] = useState(true);
@@ -56,8 +64,6 @@ export function InterviewVideoFeed({
       return;
     }
 
-    if (!videoRef.current) return;
-
     const pipeline = new VideoStreamPipeline({
       deviceId: selectedDeviceId || undefined,
       onMetricsUpdate: (m) => {
@@ -71,10 +77,12 @@ export function InterviewVideoFeed({
 
     pipelineRef.current = pipeline;
 
-    pipeline.start(videoRef.current).catch((err) => {
-      console.warn("Camera start failed:", err);
-      setCameraError("Camera permission denied or device busy");
-    });
+    if (videoRef.current) {
+      pipeline.start(videoRef.current).catch((err) => {
+        console.warn("Camera start failed:", err);
+        setCameraError("Camera permission denied or device busy");
+      });
+    }
 
     return () => {
       pipeline.stop();
@@ -139,12 +147,12 @@ export function InterviewVideoFeed({
       <div className="relative flex-1 w-full h-full flex items-center justify-center bg-zinc-900 overflow-hidden">
         {isCameraActive ? (
           <video
-            ref={videoRef}
+            ref={setVideoRef}
             autoPlay
             playsInline
             muted
             className={`w-full h-full object-cover transition-transform duration-300 ${
-              isMirrored ? "scale-x-[-1]" : ""
+              isMirrored ? "-scale-x-100" : ""
             }`}
           />
         ) : (
