@@ -19,8 +19,9 @@ export class ReportsController {
   @Get('interviews/:id/report')
   async getReport(
     @Param('id') sessionId: string,
+    @Req() req: { user: UserProfile },
   ): Promise<ComprehensiveInterviewReport> {
-    return this.reportsService.getReport(sessionId);
+    return this.reportsService.getReport(sessionId, req.user.id);
   }
 
   /**
@@ -29,8 +30,9 @@ export class ReportsController {
   @Post('interviews/:id/report')
   async generateReport(
     @Param('id') sessionId: string,
+    @Req() req: { user: UserProfile },
   ): Promise<ComprehensiveInterviewReport> {
-    return this.reportsService.generateReport(sessionId);
+    return this.reportsService.generateReport(sessionId, req.user.id);
   }
 
   /**

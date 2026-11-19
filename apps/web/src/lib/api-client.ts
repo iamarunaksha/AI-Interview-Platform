@@ -69,10 +69,46 @@ async function apiFetch<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+  let res = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });
+
+  // Enterprise token refresh: on 401 unauthorized, attempt refresh once if refresh token is present
+  if (res.status === 401 && !endpoint.includes("/auth/")) {
+    const refreshToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem(REFRESH_TOKEN_KEY)
+        : null;
+
+    if (refreshToken) {
+      try {
+        const refreshRes = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        if (refreshRes.ok) {
+          const data = (await refreshRes.json()) as { accessToken: string };
+          if (data.accessToken) {
+            if (typeof window !== "undefined") {
+              localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+            }
+            headers.set("Authorization", `Bearer ${data.accessToken}`);
+            res = await fetch(`${API_BASE_URL}${endpoint}`, {
+              ...options,
+              headers,
+            });
+          }
+        } else {
+          clearStoredTokens();
+        }
+      } catch {
+        clearStoredTokens();
+      }
+    }
+  }
 
   if (!res.ok) {
     let errorDetails: string = `Request failed with status ${res.status}`;

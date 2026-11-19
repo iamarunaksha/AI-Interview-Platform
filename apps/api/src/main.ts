@@ -94,6 +94,9 @@ async function bootstrap() {
     },
   });
 
+  // Enable graceful shutdown lifecycle hooks
+  app.enableShutdownHooks();
+
   const port = process.env.PORT ?? 4000;
   await app.listen(port);
   console.log(`🚀 InterviewAI API running at http://localhost:${port}`);

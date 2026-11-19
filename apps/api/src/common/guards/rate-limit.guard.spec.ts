@@ -95,4 +95,26 @@ describe('RateLimitGuard', () => {
     // Client B should not be affected by Client A
     expect(guard.canActivate(ctxB)).toBe(true);
   });
+
+  it('should set X-RateLimit-Reset header along with limit and remaining', () => {
+    vi.mocked(mockReflector.getAllAndOverride!).mockReturnValue({
+      limit: 5,
+      ttlSeconds: 60,
+    });
+    const ctx = createMockContext('192.168.1.50');
+    const res = ctx.switchToHttp().getResponse();
+
+    expect(guard.canActivate(ctx)).toBe(true);
+    expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', '5');
+    expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', '4');
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'X-RateLimit-Reset',
+      expect.any(String),
+    );
+  });
+
+  it('should cleanly unbind interval timer onModuleDestroy', () => {
+    guard.onModuleDestroy();
+    expect(guard['hits'].size).toBe(0);
+  });
 });

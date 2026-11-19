@@ -17,6 +17,11 @@ describe('InterviewGateway', () => {
     };
 
     mockInterviewService = {
+      getSession: vi.fn().mockResolvedValue({
+        id: 'session-123',
+        candidateId: 'user-123',
+        status: InterviewStatus.IN_PROGRESS,
+      } as any),
       startSession: vi.fn().mockResolvedValue({
         id: 'session-123',
         status: InterviewStatus.IN_PROGRESS,
@@ -131,6 +136,40 @@ describe('InterviewGateway', () => {
     expect(mockSocket.emit).toHaveBeenCalledWith(
       'session.ended',
       expect.objectContaining({ type: 'session.ended' }),
+    );
+  });
+
+  it('should reject join attempt with UNAUTHORIZED_SESSION_ACCESS when user does not own session', async () => {
+    (mockSocket as any).data = {
+      user: { id: 'unauthorized-user-999', email: 'intruder@example.com' },
+    };
+
+    await gateway.handleJoinSession(mockSocket as Socket, {
+      sessionId: 'session-123',
+    });
+
+    expect(mockSocket.join).not.toHaveBeenCalled();
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'session.error',
+      expect.objectContaining({
+        code: 'UNAUTHORIZED_SESSION_ACCESS',
+      }),
+    );
+  });
+
+  it('should close realtime bridge on disconnect when last socket leaves', async () => {
+    mockInterviewService.closeRealtimeBridge = vi
+      .fn()
+      .mockResolvedValue(undefined);
+
+    await gateway.handleJoinSession(mockSocket as Socket, {
+      sessionId: 'session-123',
+    });
+
+    await gateway.handleDisconnect(mockSocket as Socket);
+
+    expect(mockInterviewService.closeRealtimeBridge).toHaveBeenCalledWith(
+      'session-123',
     );
   });
 });

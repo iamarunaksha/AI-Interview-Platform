@@ -9,6 +9,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const isSsl = config.get<string>('DATABASE_SSL') === 'true';
+        const isProd = config.get<string>('NODE_ENV') === 'production';
+        const syncEnabled =
+          !isProd && config.get<string>('DB_SYNCHRONIZE', 'true') === 'true';
+
         return {
           type: 'postgres',
           host: config.get<string>('DATABASE_HOST', 'localhost'),
@@ -18,7 +22,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
           database: config.get<string>('DATABASE_NAME', 'postgres'),
           ssl: isSsl ? { rejectUnauthorized: false } : false,
           autoLoadEntities: true,
-          synchronize: config.get<string>('NODE_ENV') !== 'production',
+          synchronize: syncEnabled,
+          extra: {
+            max: Number(config.get<number>('DATABASE_POOL_MAX', 20)),
+            connectionTimeoutMillis: Number(
+              config.get<number>('DATABASE_TIMEOUT', 10000),
+            ),
+          },
         };
       },
     }),

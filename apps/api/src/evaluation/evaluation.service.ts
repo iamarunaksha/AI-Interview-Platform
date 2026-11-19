@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, type FindOptionsRelations } from 'typeorm';
 import { EvaluationEntity } from './entities/evaluation.entity.js';
@@ -39,7 +44,7 @@ export class EvaluationService {
    */
   async evaluateSession(
     sessionId: string,
-    options?: { provider?: string },
+    options?: { provider?: string; userId?: string },
   ): Promise<EvaluationEntity> {
     const session = await this.sessionRepo.findOne({
       where: { id: sessionId },
@@ -50,6 +55,12 @@ export class EvaluationService {
 
     if (!session) {
       throw new NotFoundException(`Interview session ${sessionId} not found`);
+    }
+
+    if (options?.userId && session.candidateId !== options.userId) {
+      throw new ForbiddenException(
+        'You do not have permission to evaluate this interview session',
+      );
     }
 
     // 1. Gather all granular evidence records collected for this session
@@ -181,9 +192,26 @@ export class EvaluationService {
   }
 
   /**
-   * Get existing evaluation for an interview session.
+   * Get existing evaluation for an interview session, optionally verifying user ownership.
    */
-  async getEvaluation(sessionId: string): Promise<EvaluationEntity | null> {
+  async getEvaluation(
+    sessionId: string,
+    userId?: string,
+  ): Promise<EvaluationEntity | null> {
+    if (userId) {
+      const session = await this.sessionRepo.findOne({
+        where: { id: sessionId },
+      });
+      if (!session) {
+        throw new NotFoundException(`Interview session ${sessionId} not found`);
+      }
+      if (session.candidateId !== userId) {
+        throw new ForbiddenException(
+          'You do not have permission to view this evaluation',
+        );
+      }
+    }
+
     return this.evalRepo.findOne({
       where: { sessionId },
       relations: {

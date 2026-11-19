@@ -96,6 +96,14 @@ export class InterviewOrchestratorService {
   }
 
   /**
+   * Clear orchestrator in-memory state for a concluded session to prevent memory leaks.
+   */
+  clearSession(sessionId: string): void {
+    this.sessionStates.delete(sessionId);
+    this.logger.debug(`Cleared orchestrator state for session ${sessionId}`);
+  }
+
+  /**
    * Build the initial system instruction for a session.
    */
   getInitialInstruction(session: InterviewSessionEntity): string {

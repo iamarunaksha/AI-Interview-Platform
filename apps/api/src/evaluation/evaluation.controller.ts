@@ -4,12 +4,13 @@ import {
   Post,
   Param,
   Query,
+  Req,
   UseGuards,
   NotFoundException,
 } from '@nestjs/common';
 import { EvaluationService } from './evaluation.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
-import type { InterviewReport } from '@interviewai/shared-types';
+import type { InterviewReport, UserProfile } from '@interviewai/shared-types';
 
 @Controller('interviews/:id/evaluation')
 @UseGuards(JwtAuthGuard)
@@ -22,10 +23,12 @@ export class EvaluationController {
   @Post()
   async evaluate(
     @Param('id') sessionId: string,
+    @Req() req: { user: UserProfile },
     @Query('provider') provider?: string,
   ): Promise<InterviewReport> {
     const evaluation = await this.evaluationService.evaluateSession(sessionId, {
       provider,
+      userId: req.user.id,
     });
     return this.evaluationService.mapToReport(evaluation);
   }
@@ -36,8 +39,12 @@ export class EvaluationController {
   @Get()
   async getEvaluation(
     @Param('id') sessionId: string,
+    @Req() req: { user: UserProfile },
   ): Promise<InterviewReport> {
-    const evaluation = await this.evaluationService.getEvaluation(sessionId);
+    const evaluation = await this.evaluationService.getEvaluation(
+      sessionId,
+      req.user.id,
+    );
     if (!evaluation) {
       throw new NotFoundException(
         `Evaluation for interview session ${sessionId} not found. Run POST /api/interviews/${sessionId}/evaluation first.`,

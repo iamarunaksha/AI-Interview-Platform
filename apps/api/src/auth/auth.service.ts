@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -28,7 +33,8 @@ import type { UserProfile, AuthResponse } from '@interviewai/shared-types';
  *      for now). Longer-lived for convenience.
  */
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
   private readonly bcryptRounds = 12;
 
   constructor(
@@ -36,6 +42,29 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
+
+  onModuleInit() {
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    const jwtSecret = this.configService.get<string>(
+      'JWT_SECRET',
+      'dev-secret-change-me',
+    );
+    const refreshSecret = this.configService.get<string>(
+      'JWT_REFRESH_SECRET',
+      'refresh-dev-secret',
+    );
+
+    if (nodeEnv === 'production') {
+      if (
+        jwtSecret === 'dev-secret-change-me' ||
+        refreshSecret === 'refresh-dev-secret'
+      ) {
+        throw new Error(
+          'FATAL SECURITY VIOLATION: Default JWT secrets detected in production environment! Set JWT_SECRET and JWT_REFRESH_SECRET to cryptographically secure strings.',
+        );
+      }
+    }
+  }
 
   /**
    * Register a new user.
@@ -136,6 +165,33 @@ export class AuthService {
     }
 
     return this.toUserProfile(user);
+  }
+
+  /**
+   * Cryptographically verify an access token and return the associated UserProfile.
+   * Used for WebSocket handshake auth and cross-module token verification.
+   */
+  async verifyAccessToken(token: string): Promise<UserProfile> {
+    const secret = this.configService.get<string>(
+      'JWT_SECRET',
+      'dev-secret-change-me',
+    );
+    try {
+      const payload = await this.jwtService.verifyAsync<{
+        sub: string;
+        type: string;
+      }>(token, { secret });
+
+      if (payload.type !== 'access') {
+        throw new UnauthorizedException('Invalid token type');
+      }
+
+      return await this.getProfile(payload.sub);
+    } catch {
+      throw new UnauthorizedException(
+        'Invalid or expired authentication token',
+      );
+    }
   }
 
   // ── Private helpers ──────────────────────────────────

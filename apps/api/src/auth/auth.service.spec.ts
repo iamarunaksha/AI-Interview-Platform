@@ -101,4 +101,67 @@ describe('AuthService', () => {
       );
     });
   });
+
+  describe('verifyAccessToken', () => {
+    it('should verify and return user profile for a valid token', async () => {
+      const mockUser = {
+        id: 'u-123',
+        email: 'test@example.com',
+        name: 'John Doe',
+        passwordHash: 'hashed',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (mockJwtService as any).verifyAsync = vi
+        .fn()
+        .mockResolvedValue({ sub: 'u-123', type: 'access' });
+      vi.spyOn(mockUsersService, 'findById').mockResolvedValue(mockUser);
+
+      const profile = await authService.verifyAccessToken('valid-token');
+      expect(profile.id).toBe('u-123');
+      expect(profile.email).toBe('test@example.com');
+    });
+
+    it('should throw UnauthorizedException if token type is not access', async () => {
+      (mockJwtService as any).verifyAsync = vi
+        .fn()
+        .mockResolvedValue({ sub: 'u-123', type: 'refresh' });
+
+      await expect(
+        authService.verifyAccessToken('wrong-type-token'),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('onModuleInit', () => {
+    it('should throw an error in production if default secrets are detected', () => {
+      vi.spyOn(mockConfigService, 'get').mockImplementation(
+        (key: string, defaultValue?: any) => {
+          if (key === 'NODE_ENV') return 'production';
+          if (key === 'JWT_SECRET') return 'dev-secret-change-me';
+          return defaultValue;
+        },
+      );
+
+      expect(() => authService.onModuleInit()).toThrow(
+        /FATAL SECURITY VIOLATION/,
+      );
+    });
+
+    it('should pass cleanly when secure secrets are configured in production', () => {
+      vi.spyOn(mockConfigService, 'get').mockImplementation(
+        (key: string, defaultValue?: any) => {
+          if (key === 'NODE_ENV') return 'production';
+          if (key === 'JWT_SECRET') return 'super-cryptographic-random-secret';
+          if (key === 'JWT_REFRESH_SECRET')
+            return 'another-secure-random-secret';
+          return defaultValue;
+        },
+      );
+
+      expect(() => authService.onModuleInit()).not.toThrow();
+    });
+  });
 });

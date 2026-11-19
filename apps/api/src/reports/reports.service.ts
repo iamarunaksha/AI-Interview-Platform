@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, type FindOptionsRelations } from 'typeorm';
 import {
@@ -42,6 +47,7 @@ export class ReportsService {
    */
   async generateReport(
     sessionId: string,
+    userId?: string,
   ): Promise<ComprehensiveInterviewReport> {
     this.logger.log(`Generating report for interview session: ${sessionId}`);
 
@@ -54,6 +60,12 @@ export class ReportsService {
 
     if (!session) {
       throw new NotFoundException(`Interview session ${sessionId} not found`);
+    }
+
+    if (userId && session.candidateId !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to generate this report',
+      );
     }
 
     // Ensure evaluation exists. If not, trigger the independent evaluation engine.
@@ -199,7 +211,24 @@ export class ReportsService {
   /**
    * Retrieve the saved report for a session, or generate it if absent.
    */
-  async getReport(sessionId: string): Promise<ComprehensiveInterviewReport> {
+  async getReport(
+    sessionId: string,
+    userId?: string,
+  ): Promise<ComprehensiveInterviewReport> {
+    if (userId) {
+      const session = await this.sessionRepository.findOne({
+        where: { id: sessionId },
+      });
+      if (!session) {
+        throw new NotFoundException(`Interview session ${sessionId} not found`);
+      }
+      if (session.candidateId !== userId) {
+        throw new ForbiddenException(
+          'You do not have permission to view this report',
+        );
+      }
+    }
+
     const existing = await this.reportRepository.findOne({
       where: { sessionId },
     });
@@ -208,7 +237,7 @@ export class ReportsService {
       return existing.reportData;
     }
 
-    return this.generateReport(sessionId);
+    return this.generateReport(sessionId, userId);
   }
 
   /**

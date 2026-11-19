@@ -265,6 +265,11 @@ export default function InterviewRoomPage({ params }: PageProps) {
   }, [sessionId]);
 
   // Socket & Audio connection lifecycle
+  const sessionStatusRef = useRef(session?.status);
+  useEffect(() => {
+    sessionStatusRef.current = session?.status;
+  }, [session?.status]);
+
   useEffect(() => {
     if (!sessionId || !session) return;
 
@@ -283,9 +288,10 @@ export default function InterviewRoomPage({ params }: PageProps) {
     interviewSocket.connect(sessionId, {
       onReady: () => {
         // Attempt mic auto-start if in progress
+        const currentStatus = sessionStatusRef.current;
         if (
-          session.status === InterviewStatus.IN_PROGRESS ||
-          session.status === InterviewStatus.CREATED
+          currentStatus === InterviewStatus.IN_PROGRESS ||
+          currentStatus === InterviewStatus.CREATED
         ) {
           recorder
             .start()
@@ -322,7 +328,9 @@ export default function InterviewRoomPage({ params }: PageProps) {
       audioPlayer.stopAll();
       interviewSocket.disconnect();
     };
-  }, [sessionId, session, handleSocketEvent]);
+    // Only connect when sessionId or initial presence of session is ready; avoid bouncing socket on status updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, Boolean(session), handleSocketEvent]);
 
   const handleToggleMic = async () => {
     if (!recorderRef.current) return;

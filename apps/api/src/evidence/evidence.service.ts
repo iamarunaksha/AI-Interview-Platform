@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, type FindOptionsRelations } from 'typeorm';
 import { EvidenceRecordEntity } from './entities/evidence-record.entity.js';
@@ -24,6 +29,7 @@ export class EvidenceService {
    */
   async extractAndSaveEvidence(
     dto: ExtractEvidenceDto,
+    userId?: string,
   ): Promise<EvidenceRecordEntity> {
     const session = await this.sessionRepo.findOne({
       where: { id: dto.sessionId },
@@ -34,6 +40,12 @@ export class EvidenceService {
 
     if (!session) {
       throw new NotFoundException(`Session ${dto.sessionId} not found`);
+    }
+
+    if (userId && session.candidateId !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to extract evidence for this session',
+      );
     }
 
     // Determine expected concepts and misconceptions from session's active question if not supplied
@@ -82,7 +94,22 @@ export class EvidenceService {
    */
   async getEvidenceBySession(
     sessionId: string,
+    userId?: string,
   ): Promise<EvidenceRecordEntity[]> {
+    if (userId) {
+      const session = await this.sessionRepo.findOne({
+        where: { id: sessionId },
+      });
+      if (!session) {
+        throw new NotFoundException(`Session ${sessionId} not found`);
+      }
+      if (session.candidateId !== userId) {
+        throw new ForbiddenException(
+          'You do not have permission to view evidence for this session',
+        );
+      }
+    }
+
     return this.evidenceRepo.find({
       where: { sessionId },
       order: { createdAt: 'ASC' },
@@ -98,7 +125,22 @@ export class EvidenceService {
   async getEvidenceByCompetency(
     sessionId: string,
     competencyId: string,
+    userId?: string,
   ): Promise<EvidenceRecordEntity[]> {
+    if (userId) {
+      const session = await this.sessionRepo.findOne({
+        where: { id: sessionId },
+      });
+      if (!session) {
+        throw new NotFoundException(`Session ${sessionId} not found`);
+      }
+      if (session.candidateId !== userId) {
+        throw new ForbiddenException(
+          'You do not have permission to view evidence for this session',
+        );
+      }
+    }
+
     return this.evidenceRepo.find({
       where: { sessionId, competencyId },
       order: { createdAt: 'ASC' },
@@ -113,6 +155,7 @@ export class EvidenceService {
    */
   async batchExtractFromTranscript(
     sessionId: string,
+    userId?: string,
   ): Promise<EvidenceRecordEntity[]> {
     const session = await this.sessionRepo.findOne({
       where: { id: sessionId },
@@ -123,6 +166,12 @@ export class EvidenceService {
 
     if (!session) {
       throw new NotFoundException(`Session ${sessionId} not found`);
+    }
+
+    if (userId && session.candidateId !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to extract evidence for this session',
+      );
     }
 
     const transcript = session.transcript || [];

@@ -299,22 +299,28 @@ export class CodingSandboxService {
     startTime = Date.now(),
   ): Promise<CodeExecutionResult> {
     return new Promise((resolve) => {
+      // Encode test cases and entry function safely in Base64 to prevent string-escape or injection exploits
+      const testCasesBase64 = Buffer.from(JSON.stringify(testCases)).toString(
+        'base64',
+      );
+      const entryFnBase64 = Buffer.from(entryFunction || '').toString('base64');
+
       // Build test runner wrapper in Python
       const runnerScript = `
-import sys, json, time
+import sys, json, time, base64
 
 # User solution
 ${code}
 
-test_cases = json.loads('''${JSON.stringify(testCases).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
+test_cases = json.loads(base64.b64decode("${testCasesBase64}").decode('utf-8'))
+entry_fn_name = base64.b64decode("${entryFnBase64}").decode('utf-8')
 results = []
 passed_count = 0
 
-entry_fn_name = "${entryFunction || ''}"
 if not entry_fn_name:
     # Auto-detect function
     for name in dir():
-        if not name.startswith('_') and callable(globals()[name]) and name not in ['json', 'sys', 'time']:
+        if not name.startswith('_') and callable(globals()[name]) and name not in ['json', 'sys', 'time', 'base64']:
             entry_fn_name = name
             break
 
@@ -444,11 +450,51 @@ print(json.dumps({"results": results, "passedCount": passed_count}))
 
   /**
    * Helper for deep structural comparison of test case outputs.
+   * Handles primitives, arrays, and nested objects with arbitrary key ordering.
    */
   private areOutputsEqual(actual: unknown, expected: unknown): boolean {
     if (actual === expected) return true;
     if (actual === undefined && expected === null) return true;
     if (actual === null && expected === undefined) return true;
+
+    if (
+      typeof actual === 'object' &&
+      actual !== null &&
+      typeof expected === 'object' &&
+      expected !== null
+    ) {
+      if (Array.isArray(actual) !== Array.isArray(expected)) {
+        return false;
+      }
+
+      if (Array.isArray(actual) && Array.isArray(expected)) {
+        if (actual.length !== expected.length) return false;
+        for (let i = 0; i < actual.length; i++) {
+          if (!this.areOutputsEqual(actual[i], expected[i])) return false;
+        }
+        return true;
+      }
+
+      const actualKeys = Object.keys(actual as Record<string, unknown>).sort();
+      const expectedKeys = Object.keys(
+        expected as Record<string, unknown>,
+      ).sort();
+
+      if (actualKeys.length !== expectedKeys.length) return false;
+      for (let i = 0; i < actualKeys.length; i++) {
+        const key = actualKeys[i];
+        if (key !== expectedKeys[i]) return false;
+        if (
+          !this.areOutputsEqual(
+            (actual as Record<string, unknown>)[key],
+            (expected as Record<string, unknown>)[key],
+          )
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
 
     try {
       return JSON.stringify(actual) === JSON.stringify(expected);

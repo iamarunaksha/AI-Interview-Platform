@@ -47,8 +47,11 @@ export class InterviewController {
    * Get details of a specific interview session.
    */
   @Get(':id')
-  async getSession(@Param('id') id: string): Promise<InterviewSessionResponse> {
-    const session = await this.interviewService.getSession(id);
+  async getSession(
+    @Param('id') id: string,
+    @Req() req: { user: UserProfile },
+  ): Promise<InterviewSessionResponse> {
+    const session = await this.interviewService.getSession(id, req.user.id);
     return this.interviewService.mapToResponse(session);
   }
 
@@ -58,16 +61,20 @@ export class InterviewController {
   @Post(':id/start')
   async startSession(
     @Param('id') id: string,
+    @Req() req: { user: UserProfile },
   ): Promise<InterviewSessionResponse> {
-    return this.interviewService.startSession(id);
+    return this.interviewService.startSession(id, req.user.id);
   }
 
   /**
    * Complete an interview session.
    */
   @Post(':id/end')
-  async endSession(@Param('id') id: string): Promise<InterviewSessionResponse> {
-    return this.interviewService.endSession(id);
+  async endSession(
+    @Param('id') id: string,
+    @Req() req: { user: UserProfile },
+  ): Promise<InterviewSessionResponse> {
+    return this.interviewService.endSession(id, req.user.id);
   }
 
   /**
@@ -76,8 +83,9 @@ export class InterviewController {
   @Get(':id/orchestrator')
   async getOrchestratorState(
     @Param('id') id: string,
+    @Req() req: { user: UserProfile },
   ): Promise<OrchestratorState | null> {
-    const session = await this.interviewService.getSession(id);
+    const session = await this.interviewService.getSession(id, req.user.id);
     return this.interviewService.getOrchestratorState(session.id);
   }
 
@@ -85,8 +93,11 @@ export class InterviewController {
    * Get the recorded transcript for an interview session.
    */
   @Get(':id/transcript')
-  async getTranscript(@Param('id') id: string): Promise<TranscriptTurn[]> {
-    const session = await this.interviewService.getSession(id);
+  async getTranscript(
+    @Param('id') id: string,
+    @Req() req: { user: UserProfile },
+  ): Promise<TranscriptTurn[]> {
+    const session = await this.interviewService.getSession(id, req.user.id);
     return session.transcript || [];
   }
 }

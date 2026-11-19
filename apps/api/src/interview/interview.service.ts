@@ -3,7 +3,9 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Optional,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, type FindOptionsRelations } from 'typeorm';
@@ -34,7 +36,7 @@ import type { CreateInterviewSessionDto } from './dto/create-interview.dto.js';
 import { CodingService } from '../coding/coding.service.js';
 
 @Injectable()
-export class InterviewService {
+export class InterviewService implements OnModuleDestroy {
   private readonly logger = new Logger(InterviewService.name);
   private readonly activeRealtimeSessions = new Map<string, IRealtimeSession>();
   private readonly sessionEventCallbacks = new Map<
@@ -49,6 +51,7 @@ export class InterviewService {
     string,
     { isCameraActive: boolean; layoutMode?: VideoLayoutMode }
   >();
+  private readonly transcriptQueues = new Map<string, Promise<void>>();
 
   constructor(
     @InjectRepository(InterviewSessionEntity)
@@ -120,9 +123,12 @@ export class InterviewService {
   }
 
   /**
-   * Get an interview session by ID.
+   * Get an interview session by ID, optionally validating candidate ownership.
    */
-  async getSession(sessionId: string): Promise<InterviewSessionEntity> {
+  async getSession(
+    sessionId: string,
+    userId?: string,
+  ): Promise<InterviewSessionEntity> {
     const session = await this.sessionRepo.findOne({
       where: { id: sessionId },
       relations: {
@@ -132,6 +138,12 @@ export class InterviewService {
 
     if (!session) {
       throw new NotFoundException(`Interview session '${sessionId}' not found`);
+    }
+
+    if (userId && session.candidateId !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to access this interview session',
+      );
     }
 
     return session;
@@ -155,8 +167,11 @@ export class InterviewService {
   /**
    * Start an interview session.
    */
-  async startSession(sessionId: string): Promise<InterviewSessionResponse> {
-    const session = await this.getSession(sessionId);
+  async startSession(
+    sessionId: string,
+    userId?: string,
+  ): Promise<InterviewSessionResponse> {
+    const session = await this.getSession(sessionId, userId);
     if (session.status === InterviewStatus.COMPLETED) {
       throw new BadRequestException(
         'Cannot start an already completed interview.',
@@ -172,8 +187,11 @@ export class InterviewService {
   /**
    * Pause an interview session.
    */
-  async pauseSession(sessionId: string): Promise<InterviewSessionResponse> {
-    const session = await this.getSession(sessionId);
+  async pauseSession(
+    sessionId: string,
+    userId?: string,
+  ): Promise<InterviewSessionResponse> {
+    const session = await this.getSession(sessionId, userId);
     session.status = InterviewStatus.PAUSED;
     const updated = await this.sessionRepo.save(session);
     return this.mapToResponse(updated);
@@ -182,8 +200,11 @@ export class InterviewService {
   /**
    * End an interview session.
    */
-  async endSession(sessionId: string): Promise<InterviewSessionResponse> {
-    const session = await this.getSession(sessionId);
+  async endSession(
+    sessionId: string,
+    userId?: string,
+  ): Promise<InterviewSessionResponse> {
+    const session = await this.getSession(sessionId, userId);
     session.status = InterviewStatus.COMPLETED;
     session.endedAt = new Date();
     const updated = await this.sessionRepo.save(session);
@@ -194,15 +215,44 @@ export class InterviewService {
 
   /**
    * Append a turn to the interview session's persistent transcript.
+   * Serializes database writes per-session via a promise chain to eliminate race conditions,
+   * and deduplicates consecutive identical turns within 2 seconds.
    */
   async appendTranscriptTurn(
     sessionId: string,
     turn: TranscriptTurn,
   ): Promise<void> {
-    const session = await this.getSession(sessionId);
-    const existing = session.transcript || [];
-    session.transcript = [...existing, turn];
-    await this.sessionRepo.save(session);
+    const previous = this.transcriptQueues.get(sessionId) || Promise.resolve();
+
+    const next = previous
+      .then(async () => {
+        const session = await this.getSession(sessionId);
+        const existing = session.transcript || [];
+
+        // Deduplicate if identical turn was just appended
+        if (existing.length > 0) {
+          const last = existing[existing.length - 1];
+          if (
+            last.role === turn.role &&
+            last.text.trim() === turn.text.trim() &&
+            Math.abs(last.timestamp - turn.timestamp) < 2000
+          ) {
+            return;
+          }
+        }
+
+        session.transcript = [...existing, turn];
+        await this.sessionRepo.save(session);
+      })
+      .catch((err) => {
+        this.logger.error(
+          `Failed to append transcript turn for session ${sessionId}:`,
+          err,
+        );
+      });
+
+    this.transcriptQueues.set(sessionId, next);
+    await next;
   }
 
   /**
@@ -414,7 +464,7 @@ export class InterviewService {
   }
 
   /**
-   * Close and cleanup the active real-time bridge.
+   * Close and cleanup the active real-time bridge and all associated session state.
    */
   async closeRealtimeBridge(sessionId: string): Promise<void> {
     const bridge = this.activeRealtimeSessions.get(sessionId);
@@ -424,6 +474,35 @@ export class InterviewService {
       this.sessionEventCallbacks.delete(sessionId);
       this.logger.log(`Closed realtime bridge for session ${sessionId}`);
     }
+
+    // Clean up code, video, transcript queue, and orchestrator state to eliminate memory leaks
+    this.sessionCodeMap.delete(sessionId);
+    this.sessionVideoMap.delete(sessionId);
+    this.transcriptQueues.delete(sessionId);
+    this.orchestrator.clearSession(sessionId);
+  }
+
+  /**
+   * Graceful shutdown hook: cleanly closes all open realtime sessions on process termination.
+   */
+  async onModuleDestroy(): Promise<void> {
+    this.logger.log(
+      'Gracefully closing all active realtime bridges on shutdown...',
+    );
+    for (const [sessionId, bridge] of this.activeRealtimeSessions.entries()) {
+      try {
+        await bridge.close();
+      } catch (err) {
+        this.logger.warn(
+          `Error closing bridge on destroy for ${sessionId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    this.activeRealtimeSessions.clear();
+    this.sessionEventCallbacks.clear();
+    this.sessionCodeMap.clear();
+    this.sessionVideoMap.clear();
+    this.transcriptQueues.clear();
   }
 
   /**

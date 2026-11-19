@@ -8,18 +8,21 @@ import {
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Logger, Optional } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { InterviewService } from './interview.service.js';
+import { AuthService } from '../auth/auth.service.js';
 import type {
   ConversationEvent,
   ProgrammingLanguage,
   VideoLayoutMode,
+  UserProfile,
 } from '@interviewai/shared-types';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    credentials: true,
   },
   namespace: '/interview',
 })
@@ -32,14 +35,33 @@ export class InterviewGateway
   private readonly logger = new Logger(InterviewGateway.name);
   private readonly socketSessionMap = new Map<string, string>();
 
-  constructor(private readonly interviewService: InterviewService) {}
+  constructor(
+    private readonly interviewService: InterviewService,
+    @Optional() private readonly authService?: AuthService,
+  ) {}
 
   afterInit() {
     this.logger.log('🚀 Interview WebSocket Gateway initialized on /interview');
   }
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
+    try {
+      const token =
+        (client.handshake.auth?.token as string | undefined) ||
+        client.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
+      if (token && this.authService) {
+        const user = await this.authService.verifyAccessToken(token);
+        client.data.user = user;
+        this.logger.log(
+          `Client ${client.id} authenticated as ${user.email} (${user.id})`,
+        );
+      }
+    } catch (err) {
+      this.logger.debug(
+        `Client ${client.id} connected without valid auth token: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async handleDisconnect(client: Socket) {
@@ -47,6 +69,19 @@ export class InterviewGateway
     const sessionId = this.socketSessionMap.get(client.id);
     if (sessionId) {
       this.socketSessionMap.delete(client.id);
+      // Clean up realtime bridge only if no remaining sockets are connected to this session
+      const remainingSockets = Array.from(
+        this.socketSessionMap.values(),
+      ).includes(sessionId);
+      if (!remainingSockets) {
+        await this.interviewService
+          .closeRealtimeBridge(sessionId)
+          .catch((err) => {
+            this.logger.warn(
+              `Error closing realtime bridge on disconnect for session ${sessionId}: ${err}`,
+            );
+          });
+      }
     }
   }
 
@@ -56,9 +91,9 @@ export class InterviewGateway
   @SubscribeMessage('session.join')
   async handleJoinSession(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { sessionId: string },
+    @MessageBody() data: { sessionId: string; token?: string },
   ) {
-    const { sessionId } = data;
+    const { sessionId, token } = data;
     if (!sessionId) {
       client.emit('session.error', {
         type: 'session.error',
@@ -70,10 +105,53 @@ export class InterviewGateway
     }
 
     try {
+      // 1. Authenticate user if not already set on client
+      let user: UserProfile | undefined = client.data?.user;
+      if (!user && this.authService) {
+        const candidateToken =
+          token ||
+          (client.handshake.auth?.token as string | undefined) ||
+          client.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
+        if (candidateToken) {
+          try {
+            user = await this.authService.verifyAccessToken(candidateToken);
+            client.data.user = user;
+          } catch {
+            // Token invalid or expired
+          }
+        }
+      }
+
+      // 2. Validate session existence & access control
+      const session = await this.interviewService.getSession(sessionId);
+      if (!session) {
+        client.emit('session.error', {
+          type: 'session.error',
+          code: 'SESSION_NOT_FOUND',
+          message: `Interview session ${sessionId} not found`,
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
+      // If user is authenticated and session belongs to a candidate, verify ownership
+      if (user && session.candidateId && session.candidateId !== user.id) {
+        this.logger.warn(
+          `Unauthorized join attempt: User ${user.id} tried to join session ${sessionId} owned by ${session.candidateId}`,
+        );
+        client.emit('session.error', {
+          type: 'session.error',
+          code: 'UNAUTHORIZED_SESSION_ACCESS',
+          message: 'You are not authorized to join this interview session',
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
       await client.join(sessionId);
       this.socketSessionMap.set(client.id, sessionId);
       this.logger.log(
-        `Client ${client.id} joined room for session ${sessionId}`,
+        `Client ${client.id} joined room for session ${sessionId} (User: ${user?.email ?? 'anonymous'})`,
       );
 
       // Ensure session is marked in progress
