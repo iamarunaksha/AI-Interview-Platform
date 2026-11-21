@@ -316,15 +316,29 @@ export class InterviewService implements OnModuleDestroy {
         session.domain === ProfessionalDomain.SAP ||
         session.currentQuestion?.domain === ProfessionalDomain.SAP;
 
+      const isDsa =
+        !isSap &&
+        (session.currentQuestion?.competency?.slug?.includes('dsa') ||
+          session.targetRole?.toLowerCase().includes('sde') ||
+          session.targetRole?.toLowerCase().includes('software') ||
+          Boolean(
+            session.currentQuestion?.title?.toLowerCase().includes('two sum') ||
+            session.currentQuestion?.title?.toLowerCase().includes('tree') ||
+            session.currentQuestion?.title
+              ?.toLowerCase()
+              .includes('parenthes') ||
+            session.currentQuestion?.title
+              ?.toLowerCase()
+              .includes('substring') ||
+            session.currentQuestion?.title?.toLowerCase().includes('lru') ||
+            session.currentQuestion?.title?.toLowerCase().includes('ancestor'),
+          ));
+
       const greetingText = isSap
-        ? `Hello! Welcome to your technical interview today. My name is Alex, your AI technical interviewer. Today we will be exploring enterprise SAP architecture, Clean Core strategy, and module integration for the role of ${session.targetRole}. How are you doing today? Whenever you are ready, let me know and we will begin.`
-        : `Hello! Welcome to your technical interview today. My name is Alex, your AI technical interviewer. Today we'll be working through a problem in ${
-            session.currentQuestion?.competency?.slug?.includes('dsa') ||
-            session.currentQuestion?.title?.toLowerCase().includes('cache') ||
-            session.currentQuestion?.title?.toLowerCase().includes('lru')
-              ? 'Data Structures & Algorithms'
-              : 'System Architecture & Engineering'
-          }: "${session.currentQuestion?.title || 'Technical Problem'}". How are you doing today? Whenever you're ready, let me know and we'll dive in.`;
+        ? `Hello! Welcome to your technical interview today. My name is Alex, Lead SAP Solutions Architect. Today we'll be walking through an enterprise architecture and modernization scenario for the role of ${session.targetRole}, focusing on S/4HANA core business processes, Clean Core extensibility, and cloud integration. How are you doing today? Whenever you're ready, let me know and we will begin.`
+        : isDsa
+          ? `Hello! Welcome to your technical interview today. My name is Alex from the engineering team. Today's session is a 45-minute Data Structures & Algorithms round for the role of ${session.targetRole}. We'll collaborate in the code editor, and I want to see how you break down problems, consider trade-offs, and write clean, working code. How are you doing today? Whenever you're ready, let me know and we'll dive right in.`
+          : `Hello! Welcome to your technical interview today. My name is Alex from the engineering team. Today's session is a technical architecture and system design round for the role of ${session.targetRole}. How are you doing today? Whenever you're ready, let me know and we'll dive in.`;
 
       setTimeout(() => {
         const turn = {

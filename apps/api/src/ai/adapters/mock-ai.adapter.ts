@@ -321,11 +321,195 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Great! Let's dive into the technical problem. How would you approach designing an optimal solution for this scenario?`;
     }
 
-    // 1. Database Indexing & B+ Trees (if active)
+    // ── CANDIDATE CLARIFYING QUESTIONS (FAANG DSA & SAP) ─────────
+    const isClarifyingQuestion =
+      lower.includes('?') ||
+      lower.includes('clarify') ||
+      lower.includes('negative') ||
+      lower.includes('duplicate') ||
+      lower.includes('sorted') ||
+      lower.includes('empty') ||
+      lower.includes('constraint') ||
+      lower.includes('bounds') ||
+      lower.includes('in-place') ||
+      lower.includes('in place') ||
+      lower.includes('0-indexed') ||
+      lower.includes('1-indexed') ||
+      lower.includes('spaces') ||
+      lower.includes('case-sensitive') ||
+      lower.includes('case sensitive') ||
+      lower.includes('can i assume') ||
+      lower.includes('should i assume') ||
+      lower.includes('what if') ||
+      lower.includes('return if');
+
+    const questionTitle = question?.title?.toLowerCase() ?? '';
+    const questionStem = question?.stem?.toLowerCase() ?? '';
+
+    if (isClarifyingQuestion) {
+      if (
+        questionTitle.includes('two sum') ||
+        questionStem.includes('two sum')
+      ) {
+        return `Great clarifying questions. The input array is not sorted. Elements can be negative, zero, or positive within standard 32-bit integer limits. You cannot use the element at the same index twice. You may assume exactly one valid pair exists, and you should return 0-based indices. What initial approach comes to mind?`;
+      }
+      if (
+        questionTitle.includes('substring') ||
+        questionStem.includes('substring')
+      ) {
+        return `Good clarification. The string can contain standard ASCII letters, digits, symbols, and spaces. For an empty string, the expected return length is 0. We are looking for a contiguous substring, not a non-contiguous subsequence. How are you thinking of tracking the characters in the current window?`;
+      }
+      if (
+        questionTitle.includes('parentheses') ||
+        questionTitle.includes('bracket') ||
+        questionStem.includes('parentheses')
+      ) {
+        return `Good question. The input string contains only parentheses characters: '(', ')', '{', '}', '[', and ']'. An empty string is considered valid. If the string length is odd, it's immediately invalid. How would you like to model the bracket matching?`;
+      }
+      if (
+        questionTitle.includes('merge k') ||
+        questionStem.includes('merge k')
+      ) {
+        return `Great clarification. Each of the k linked lists is already sorted in ascending order. The number of lists k can be between 0 and 10^4, and individual lists can also be empty (null). Total elements across all lists will fit in memory. What data structures could help us track the current minimum across all k lists?`;
+      }
+      if (
+        questionTitle.includes('course schedule') ||
+        questionStem.includes('prerequisites')
+      ) {
+        return `Good question. Courses are labeled from 0 to numCourses - 1. There may be disconnected components, and prerequisite pairs can represent arbitrary directed edges. If there is a cycle, it's impossible to finish all courses. What graph representation and traversal algorithm would you like to use?`;
+      }
+      if (questionTitle.includes('lru') || questionStem.includes('lru')) {
+        return `Good questions. The capacity will be a positive integer greater than zero. Both get and put should operate in O(1) average time complexity. When the cache reaches capacity, the least recently used key should be evicted. What data structure combination allows both O(1) lookup and O(1) reordering?`;
+      }
+      if (
+        questionTitle.includes('lowest common ancestor') ||
+        questionTitle.includes('binary tree')
+      ) {
+        return `Great clarifying questions. All node values in the tree are unique, and both p and q are guaranteed to exist in the tree. A node is allowed to be a descendant of itself. What traversal strategy are you considering?`;
+      }
+      if (isSap) {
+        return `Good architectural question. You can assume an S/4HANA Cloud environment with modern ABAP Cloud syntax, standard released C1 CDS views, and an SAP BTP subaccount connected via Cloud Connector. Would you approach this via On-Stack Developer Extensibility (Tier 2) or Side-by-Side on BTP (Tier 3)?`;
+      }
+      return `Good clarifying question. The input is not sorted, elements can be negative or positive within standard integer ranges, and you should return 0-based indices. Memory is available for standard auxiliary structures. What approach are you leaning towards?`;
+    }
+
+    // ── CANDIDATE READY TO CODE / WRITE IMPLEMENTATION ──────────
+    const isReadyToCode =
+      lower.includes('write code') ||
+      lower.includes('start coding') ||
+      lower.includes('code it') ||
+      lower.includes('can i code') ||
+      lower.includes('start implementation') ||
+      lower.includes('implement it') ||
+      lower.includes('ready to write') ||
+      lower.includes('write the solution') ||
+      lower.includes('code this out') ||
+      lower.includes('type the code');
+
+    if (isReadyToCode) {
+      return `That approach sounds solid. Please go ahead and write the code in the editor. Feel free to think out loud and talk me through your implementation as you write it.`;
+    }
+
+    // ── CANDIDATE DRY RUN / WALKTHROUGH TEST CASES ──────────────
+    const isDryRun =
+      lower.includes('dry run') ||
+      lower.includes('walk through') ||
+      lower.includes('walkthrough') ||
+      lower.includes('test case') ||
+      lower.includes('trace') ||
+      lower.includes('step through');
+
+    if (isDryRun && this.turnCount > 3) {
+      return `Excellent dry run walkthrough. The logic steps through that test case accurately. Are there any edge cases you'd like to test or double-check—such as empty input, duplicates, or boundary values—before we wrap up?`;
+    }
+
+    // ── 1. MERGE K SORTED LISTS (FAANG Hard) ────────────────────
+    const isMergeK =
+      questionTitle.includes('merge k') ||
+      questionStem.includes('merge k') ||
+      questionTitle.includes('sorted lists');
+
+    if (isMergeK) {
+      if (
+        lower.includes('heap') ||
+        lower.includes('priority queue') ||
+        lower.includes('priorityqueue') ||
+        lower.includes('min-heap') ||
+        lower.includes('min heap')
+      ) {
+        return `Spot on. Maintaining a min-heap of size k holding the current head node of each list gives us O(N log k) time complexity, where N is the total number of nodes across all k lists. What is the auxiliary space complexity for the heap, and how do you handle lists that become empty during extraction?`;
+      }
+      if (
+        lower.includes('divide and conquer') ||
+        lower.includes('merge sort') ||
+        lower.includes('pairwise') ||
+        lower.includes('divide')
+      ) {
+        return `That is an elegant divide-and-conquer approach. Merging pairs of lists iteratively reduces the problem from k lists to k/2, k/4, down to 1 in O(N log k) time, with O(1) extra space if done in place with pointer manipulation. How does this compare with the min-heap approach?`;
+      }
+      if (
+        lower.includes('flat') ||
+        lower.includes('brute') ||
+        lower.includes('collect') ||
+        lower.includes('array sort')
+      ) {
+        return `Collecting all elements into a flat array and sorting them takes O(N log N) time and ignores the fact that each of the k lists is already sorted. How can we leverage the existing sorted order to achieve O(N log k) time?`;
+      }
+      if (question?.probingQuestions && question.probingQuestions.length > 0) {
+        const probe =
+          question.probingQuestions[
+            (this.turnCount - 1) % question.probingQuestions.length
+          ];
+        return `Good analysis. ${probe.probeText}`;
+      }
+      return `Understood. Walk me through how your implementation handles k = 0 or when an input list is [[]].`;
+    }
+
+    // ── 2. COURSE SCHEDULE & TOPOLOGICAL SORT (FAANG Medium) ────
+    const isCourseSchedule =
+      questionTitle.includes('course schedule') ||
+      questionStem.includes('prerequisites') ||
+      questionTitle.includes('topological');
+
+    if (isCourseSchedule) {
+      if (
+        lower.includes('kahn') ||
+        lower.includes('indegree') ||
+        lower.includes('in-degree') ||
+        lower.includes('topological') ||
+        lower.includes('bfs') ||
+        lower.includes('queue')
+      ) {
+        return `Spot on. Kahn's algorithm using in-degrees and a queue processes courses with zero prerequisites first. If the number of processed courses equals numCourses, there are no cycles and all courses can be finished. What are the time and space complexities in terms of V (courses) and E (prerequisites)?`;
+      }
+      if (
+        lower.includes('dfs') ||
+        lower.includes('cycle') ||
+        lower.includes('color') ||
+        lower.includes('recursion') ||
+        lower.includes('visited') ||
+        lower.includes('backtracking')
+      ) {
+        return `Great choice with DFS cycle detection. Using a three-state tracking system (0: unvisited, 1: visiting in current DFS stack, 2: fully processed) correctly identifies back-edges that indicate cycles. Why does a simple two-state boolean array fail on directed acyclic graphs?`;
+      }
+      if (lower.includes('matrix') || lower.includes('adjacency list')) {
+        return `Using an adjacency list representation takes O(V + E) space, compared to O(V²) for an adjacency matrix, which is crucial when the graph is sparse. Walk me through how your code builds the graph from the prerequisites list.`;
+      }
+      if (question?.probingQuestions && question.probingQuestions.length > 0) {
+        const probe =
+          question.probingQuestions[
+            (this.turnCount - 1) % question.probingQuestions.length
+          ];
+        return `Good analysis. ${probe.probeText}`;
+      }
+      return `Understood. Walk me through how your code handles disconnected components or courses that have no prerequisites at all.`;
+    }
+
+    // ── 3. DATABASE INDEXING & B+ TREES ─────────────────────────
     const isDbBTree =
-      question?.title?.toLowerCase().includes('b+ tree') ||
-      question?.title?.toLowerCase().includes('database indexing') ||
-      question?.stem?.toLowerCase().includes('b+ tree');
+      questionTitle.includes('b+ tree') ||
+      questionTitle.includes('database indexing') ||
+      questionStem.includes('b+ tree');
 
     if (isDbBTree) {
       if (
@@ -363,10 +547,9 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Solid reasoning. Walk me through the exact I/O operations and disk page reads when an index lookup traverses from the root node to the matching leaf node.`;
     }
 
-    // 2. Two Sum & Array Hash Mapping
+    // ── 4. TWO SUM & ARRAY HASH MAPPING ─────────────────────────
     const isTwoSum =
-      question?.title?.toLowerCase().includes('two sum') ||
-      question?.stem?.toLowerCase().includes('two sum');
+      questionTitle.includes('two sum') || questionStem.includes('two sum');
 
     if (isTwoSum) {
       if (
@@ -402,10 +585,10 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Understood. Walk me through the exact code logic for handling the case where no valid pair exists in the input array.`;
     }
 
-    // 3. Tree LCA / Binary Tree Traversal
+    // ── 5. TREE LCA / BINARY TREE TRAVERSAL ──────────────────────
     const isTreeLca =
-      question?.title?.toLowerCase().includes('lowest common ancestor') ||
-      question?.title?.toLowerCase().includes('binary tree');
+      questionTitle.includes('lowest common ancestor') ||
+      questionTitle.includes('binary tree');
 
     if (isTreeLca) {
       if (
@@ -432,11 +615,11 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Understood. How does your algorithm handle the edge case where one of the target nodes is itself the ancestor of the other?`;
     }
 
-    // 4. Valid Parentheses / Stacks
+    // ── 6. VALID PARENTHESES / STACKS ────────────────────────────
     const isStackQuestion =
-      question?.title?.toLowerCase().includes('parentheses') ||
-      question?.title?.toLowerCase().includes('bracket') ||
-      question?.stem?.toLowerCase().includes('parentheses');
+      questionTitle.includes('parentheses') ||
+      questionTitle.includes('bracket') ||
+      questionStem.includes('parentheses');
 
     if (isStackQuestion) {
       if (lower.includes('stack') || lower.includes('lifo')) {
@@ -459,10 +642,11 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Understood. Walk me through how your implementation handles an odd-length string or an empty string input.`;
     }
 
-    // 5. Sliding Window / Longest Substring
+    // ── 7. SLIDING WINDOW / LONGEST SUBSTRING ─────────────────────
     const isSlidingWindow =
-      question?.title?.toLowerCase().includes('substring') ||
-      question?.title?.toLowerCase().includes('sliding window');
+      questionTitle.includes('substring') ||
+      questionTitle.includes('sliding window') ||
+      questionStem.includes('longest substring');
 
     if (isSlidingWindow) {
       if (
@@ -478,7 +662,14 @@ class MockRealtimeSession implements IRealtimeSession {
         lower.includes('map') ||
         lower.includes('hash')
       ) {
-        return `Using a hash map to store the last seen index of each character allows the left pointer to jump directly past duplicate characters in O(1) time without stepwise increments. What is the space complexity bound given the character set (ASCII / Unicode)?`;
+        return `Using a hash map to store the last seen index of each character allows the left pointer to jump directly past duplicate characters in O(1) time without stepwise increments: left = max(left, lastSeen + 1). What is the space complexity bound given the character set (ASCII / Unicode)?`;
+      }
+      if (
+        lower.includes('ascii') ||
+        lower.includes('array') ||
+        lower.includes('table')
+      ) {
+        return `Excellent optimization. Using a fixed-size integer array of length 128 or 256 for ASCII characters provides O(1) space and cache-friendly O(1) direct addressing without hash map collision overhead. How would you update your max length variable?`;
       }
       if (question?.probingQuestions && question.probingQuestions.length > 0) {
         const probe =
@@ -490,10 +681,9 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Understood. Walk me through how your algorithm updates the maximum length variable as the window expands.`;
     }
 
-    // 6. Question-specific logic for DSA / LRU Cache
+    // ── 8. CONCURRENT LRU CACHE ──────────────────────────────────
     const isLruCache =
-      question?.title?.toLowerCase().includes('lru') ||
-      question?.stem?.toLowerCase().includes('lru');
+      questionTitle.includes('lru') || questionStem.includes('lru');
 
     if (isLruCache) {
       const mentionsMap =
@@ -548,17 +738,50 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Understood. Walk me through the exact step-by-step logic when get(key) is called on an existing key versus a missing key.`;
     }
 
-    // 7. SAP-specific logic
+    // ── 9. SAP ARCHITECTURE & CONSULTING (Realistic & Collaborative) ──
     if (isSap) {
-      if (lower.includes('bdef') || lower.includes('rap')) {
-        return `Good grasp of the ABAP RESTful Application Programming model. In the RAP save sequence, how do you handle transactional determinations without triggering commit dumps?`;
+      if (
+        lower.includes('tier') ||
+        lower.includes('clean core') ||
+        lower.includes('steampunk') ||
+        lower.includes('released api') ||
+        lower.includes('c1')
+      ) {
+        return `That is precisely aligned with modern SAP Clean Core philosophy. Tier 1 is Key User Extensibility in standard apps, Tier 2 is On-Stack Developer Extensibility (Embedded Steampunk) strictly using released C1 APIs and ABAP Cloud, and Tier 3 is Side-by-Side Extensibility on SAP BTP. Where would you draw the boundary between Tier 2 on-stack and Tier 3 side-by-side for high-volume custom billing calculations?`;
+      }
+      if (
+        lower.includes('bdef') ||
+        lower.includes('rap') ||
+        lower.includes('determination') ||
+        lower.includes('validation') ||
+        lower.includes('draft')
+      ) {
+        return `Good grasp of the ABAP RESTful Application Programming model. During the RAP transactional save sequence, determinations and validations run in the early save phase, while the late save phase handles number range assignment and the actual commit to the database. How do you prevent endless validation loops or illegal commit work dumps during the interaction phase?`;
+      }
+      if (
+        lower.includes('cpi') ||
+        lower.includes('integration suite') ||
+        lower.includes('iflow') ||
+        lower.includes('jms') ||
+        lower.includes('event mesh')
+      ) {
+        return `Solid insights on SAP Cloud Integration. When orchestrating asynchronous messages from S/4HANA to external logistics partners, how do you design the iFlow with idempotent message IDs, JMS transaction boundaries, and dead-letter queues (DLQ) to guarantee exactly-once processing during partner network outages?`;
+      }
+      if (
+        lower.includes('fubr') ||
+        lower.includes('transportation') ||
+        lower.includes('freight unit') ||
+        lower.includes('incompatibility')
+      ) {
+        return `Spot on regarding Freight Unit Building Rules (FUBR) and Incompatibilities in SAP TM. When configuring TM optimization, how do you model vehicle compartment constraints when hazardous materials cannot be consolidated with perishable goods?`;
       }
       if (
         lower.includes('acdoca') ||
         lower.includes('universal journal') ||
-        lower.includes('ledger')
+        lower.includes('ledger') ||
+        lower.includes('document splitting')
       ) {
-        return `Spot on regarding the Universal Journal (ACDOCA). How does your design ensure multi-ledger financial consistency under high-volume parallel postings?`;
+        return `Precisely. With the S/4HANA Universal Journal (ACDOCA), multi-GAAP parallel reporting is enabled through leading (0L) and non-leading ledgers. How does real-time document splitting guarantee that each segment and profit center has balanced debits and credits on every posted line item?`;
       }
       if (question?.probingQuestions && question.probingQuestions.length > 0) {
         const probe =
@@ -570,7 +793,7 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Solid architectural breakdown. How does this extension strictly adhere to SAP Clean Core Tier 2 developer extensibility with released C1 APIs when quarterly cloud upgrades occur?`;
     }
 
-    // 8. General SDE / System Design / DSA fallback
+    // ── 10. GENERAL SDE / SYSTEM DESIGN / DSA FALLBACK ──────────
     if (question?.probingQuestions && question.probingQuestions.length > 0) {
       const probe =
         question.probingQuestions[

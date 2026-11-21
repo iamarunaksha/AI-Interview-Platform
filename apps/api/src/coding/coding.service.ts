@@ -291,6 +291,232 @@ export const BUILTIN_CODING_PROBLEMS: CodingProblem[] = [
       },
     ],
   },
+  {
+    id: 'merge-k-sorted-lists',
+    title: 'Merge K Sorted Lists',
+    difficulty: InterviewDifficulty.HARD,
+    description:
+      'You are given an array of `k` linked-lists `lists`, each linked-list is sorted in ascending order. Merge all the linked-lists into one sorted linked list and return it. Represented as arrays in this sandbox.',
+    examples: [
+      {
+        input: 'lists = [[1,4,5],[1,3,4],[2,6]]',
+        output: '[1,1,2,3,4,4,5,6]',
+      },
+      {
+        input: 'lists = []',
+        output: '[]',
+      },
+      {
+        input: 'lists = [[]]',
+        output: '[]',
+      },
+    ],
+    constraints: [
+      'k == lists.length',
+      '0 <= k <= 10^4',
+      '0 <= lists[i].length <= 500',
+      '-10^4 <= lists[i][j] <= 10^4',
+      'lists[i] is sorted in ascending order.',
+    ],
+    entryFunction: 'mergeKLists',
+    starterCode: {
+      [ProgrammingLanguage.TYPESCRIPT]: `function mergeKLists(lists: number[][]): number[] {
+  // Use a min-heap or divide-and-conquer merge
+  const result: number[] = [];
+  const flat = lists.flat().sort((a, b) => a - b);
+  return flat;
+}`,
+      [ProgrammingLanguage.JAVASCRIPT]: `function mergeKLists(lists) {
+  // Use min-heap or divide-and-conquer merge
+  return lists.flat().sort((a, b) => a - b);
+}`,
+      [ProgrammingLanguage.PYTHON]: `def mergeKLists(lists):
+    import heapq
+    merged = []
+    for sublist in lists:
+        merged.extend(sublist)
+    return sorted(merged)`,
+    },
+    testCases: [
+      {
+        id: 'tc-1',
+        description: 'Merge three sorted arrays',
+        input: [
+          [
+            [1, 4, 5],
+            [1, 3, 4],
+            [2, 6],
+          ],
+        ],
+        expectedOutput: [1, 1, 2, 3, 4, 4, 5, 6],
+      },
+      {
+        id: 'tc-2',
+        description: 'Empty lists array',
+        input: [[]],
+        expectedOutput: [],
+      },
+      {
+        id: 'tc-3',
+        description: 'Array with single empty list',
+        input: [[[]]],
+        expectedOutput: [],
+      },
+      {
+        id: 'tc-4',
+        description: 'Lists with negative numbers',
+        input: [
+          [
+            [-10, -5, 0],
+            [-8, -2, 4],
+            [1, 3, 9],
+          ],
+        ],
+        expectedOutput: [-10, -8, -5, -2, 0, 1, 3, 4, 9],
+      },
+    ],
+  },
+  {
+    id: 'course-schedule',
+    title: 'Course Schedule & Dependency Resolution',
+    difficulty: InterviewDifficulty.MEDIUM,
+    description:
+      'There are a total of `numCourses` courses you have to take, labeled from `0` to `numCourses - 1`. You are given an array `prerequisites` where `prerequisites[i] = [a, b]` indicates that you must take course `b` first if you want to take course `a`. Return `true` if you can finish all courses. Otherwise, return `false`.',
+    examples: [
+      {
+        input: 'numCourses = 2, prerequisites = [[1, 0]]',
+        output: 'true',
+        explanation:
+          'To take course 1 you should have finished course 0. So it is possible.',
+      },
+      {
+        input: 'numCourses = 2, prerequisites = [[1, 0], [0, 1]]',
+        output: 'false',
+        explanation:
+          'Course 1 requires 0 and course 0 requires 1. A cycle exists so it is impossible.',
+      },
+    ],
+    constraints: [
+      '1 <= numCourses <= 2000',
+      '0 <= prerequisites.length <= 5000',
+      'prerequisites[i].length == 2',
+      '0 <= ai, bi < numCourses',
+      'All the pairs prerequisites[i] are unique.',
+    ],
+    entryFunction: 'canFinish',
+    starterCode: {
+      [ProgrammingLanguage.TYPESCRIPT]: `function canFinish(numCourses: number, prerequisites: number[][]): boolean {
+  // Kahn's algorithm (topological sort via indegree) or DFS cycle detection
+  const inDegree = new Array(numCourses).fill(0);
+  const adj = Array.from({ length: numCourses }, () => [] as number[]);
+
+  for (const [course, pre] of prerequisites) {
+    adj[pre].push(course);
+    inDegree[course]++;
+  }
+
+  const queue: number[] = [];
+  for (let i = 0; i < numCourses; i++) {
+    if (inDegree[i] === 0) queue.push(i);
+  }
+
+  let visited = 0;
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    visited++;
+    for (const neighbor of adj[node]) {
+      inDegree[neighbor]--;
+      if (inDegree[neighbor] === 0) queue.push(neighbor);
+    }
+  }
+
+  return visited === numCourses;
+}`,
+      [ProgrammingLanguage.JAVASCRIPT]: `function canFinish(numCourses, prerequisites) {
+  const inDegree = new Array(numCourses).fill(0);
+  const adj = Array.from({ length: numCourses }, () => []);
+
+  for (const [course, pre] of prerequisites) {
+    adj[pre].push(course);
+    inDegree[course]++;
+  }
+
+  const queue = [];
+  for (let i = 0; i < numCourses; i++) {
+    if (inDegree[i] === 0) queue.push(i);
+  }
+
+  let visited = 0;
+  while (queue.length > 0) {
+    const node = queue.shift();
+    visited++;
+    for (const neighbor of adj[node]) {
+      inDegree[neighbor]--;
+      if (inDegree[neighbor] === 0) queue.push(neighbor);
+    }
+  }
+
+  return visited === numCourses;
+}`,
+      [ProgrammingLanguage.PYTHON]: `def canFinish(numCourses: int, prerequisites: list) -> bool:
+    from collections import deque
+    in_degree = [0] * numCourses
+    adj = [[] for _ in range(numCourses)]
+    for course, pre in prerequisites:
+        adj[pre].append(course)
+        in_degree[course] += 1
+    queue = deque([i for i in range(numCourses) if in_degree[i] == 0])
+    visited = 0
+    while queue:
+        node = queue.popleft()
+        visited += 1
+        for neighbor in adj[node]:
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+    return visited == numCourses`,
+    },
+    testCases: [
+      {
+        id: 'tc-1',
+        description: 'Linear dependency chain',
+        input: [2, [[1, 0]]],
+        expectedOutput: true,
+      },
+      {
+        id: 'tc-2',
+        description: 'Direct 2-node cycle',
+        input: [
+          2,
+          [
+            [1, 0],
+            [0, 1],
+          ],
+        ],
+        expectedOutput: false,
+      },
+      {
+        id: 'tc-3',
+        description: 'Multiple independent courses',
+        input: [3, []],
+        expectedOutput: true,
+      },
+      {
+        id: 'tc-4',
+        description: 'Complex 4-node DAG',
+        input: [
+          4,
+          [
+            [1, 0],
+            [2, 0],
+            [3, 1],
+            [3, 2],
+          ],
+        ],
+        expectedOutput: true,
+      },
+    ],
+  },
 ];
 
 @Injectable()

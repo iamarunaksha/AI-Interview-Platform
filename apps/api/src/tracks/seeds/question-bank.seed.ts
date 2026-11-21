@@ -517,6 +517,267 @@ export const INITIAL_QUESTIONS = [
     ],
   },
   {
+    competencySlug: 'sde_dsa_problem_solving',
+    domain: ProfessionalDomain.SDE,
+    companyCategories: [
+      CompanyCategory.FAANG_STYLE,
+      CompanyCategory.PRODUCT_COMPANY,
+      CompanyCategory.SERVICE_COMPANY,
+    ],
+    experienceLevels: [
+      ExperienceLevel.FRESHER,
+      ExperienceLevel.SDE_1,
+      ExperienceLevel.SDE_2,
+    ],
+    difficulty: InterviewDifficulty.MEDIUM,
+    title: 'Longest Substring Without Repeating Characters',
+    stem: 'Given a string s, find the length of the longest substring without duplicate characters. For example, for "abcabcbb" the answer is 3 ("abc"). How do you solve this in O(N) time with a sliding window?',
+    contextPrompt:
+      'Candidate must demonstrate two-pointer sliding window, character index mapping for O(1) jump ahead, and discuss ASCII vs Unicode space bounds.',
+    expectedConcepts: [
+      'Sliding window with left (start) and right (end) pointers',
+      'Hash map or direct-access table storing last seen index of each character',
+      'When duplicate is found, fast-forwarding left pointer to max(left, lastSeen + 1)',
+      'O(N) time complexity where each character is visited at most twice',
+      'O(min(N, M)) auxiliary space where M is the character set size (e.g., 128 for ASCII or 256 for extended ASCII)',
+    ],
+    commonMisconceptions: [
+      'Using nested loops O(N^2) or checking all substrings O(N^3)',
+      'Decreasing left pointer incrementally instead of jumping directly past the duplicate',
+      'Confusing contiguous substring with non-contiguous subsequence',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-substr-1',
+        probeText:
+          'When your right pointer encounters a repeated character, why do you update left = max(left, map.get(char) + 1) instead of simply left = map.get(char) + 1?',
+        targetConcept:
+          'Preventing left pointer from moving backward past current window start',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-substr-2',
+        probeText:
+          'What is the upper bound on space complexity if the string contains arbitrary UTF-8 multibyte characters rather than ASCII?',
+        targetConcept: 'Unicode character set cardinality and memory bounds',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Proposes brute force all-substrings check in O(N^3) or O(N^2).',
+        keyIndicators: [
+          'Nested loops generating substrings',
+          'Cannot explain sliding window',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Understands sliding window with HashSet, but increments left pointer one-by-one in O(2N) time.',
+        keyIndicators: [
+          'Set-based window',
+          'Step-by-step left pointer contraction',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Implements optimal HashMap jump-forward in O(N) single-pass with clear max length tracking.',
+        keyIndicators: [
+          'HashMap last-seen index',
+          'Single-pass traversal',
+          'Accurate edge-case checks',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Analyzes ASCII integer array optimization over HashMap to eliminate hash overhead, explains Unicode code points.',
+        keyIndicators: [
+          'Int array direct addressing',
+          'Zero-allocation hot path',
+          'Handles empty/single-char strings',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sde_dsa_problem_solving',
+    domain: ProfessionalDomain.SDE,
+    companyCategories: [
+      CompanyCategory.FAANG_STYLE,
+      CompanyCategory.PRODUCT_COMPANY,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_1,
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+    ],
+    difficulty: InterviewDifficulty.HARD,
+    title: 'Merge K Sorted Lists & Min-Heap Priority Queues',
+    stem: 'You are given an array of k linked lists, each linked list is sorted in ascending order. Merge all the linked lists into one sorted linked list and return it. What is the optimal time and space complexity, and how do you achieve it?',
+    contextPrompt:
+      'Candidate should evaluate Min-Heap (PriorityQueue) vs Divide-and-Conquer 2-way merging, analyzing O(N log k) time complexity where N is total nodes across all lists.',
+    expectedConcepts: [
+      'Min-Heap (Priority Queue) containing k head elements at any time',
+      'Divide and Conquer 2-way merge reduction pattern (analogous to MergeSort)',
+      'Time complexity O(N log k) where N is total nodes and k is number of lists',
+      'Space complexity O(k) auxiliary space for heap, or O(1) for iterative divide-and-conquer',
+      'Handling empty lists and null pointers at the start or during extraction',
+    ],
+    commonMisconceptions: [
+      'Merging lists sequentially one-by-one resulting in O(k * N) worst-case time',
+      'Collecting all elements into a flat array and sorting resulting in O(N log N) time and ignoring that lists are already sorted',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-mergek-1',
+        probeText:
+          'Between using a Min-Heap of size k and iterative Divide-and-Conquer merging, what are the auxiliary space trade-offs?',
+        targetConcept:
+          'Heap O(k) space vs In-place pointer manipulation O(1) space',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-mergek-2',
+        probeText:
+          'If k is extremely large (e.g., 100,000 lists stored on disk) and cannot fit in memory, how does your merge architecture adapt?',
+        targetConcept:
+          'External merge sort and disk-backed k-way tournament tree',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Suggests sequential merging taking O(k * N) or dumping into array and sorting.',
+        keyIndicators: [
+          'O(k*N) approach',
+          'Ignores sorted property of individual lists',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Identifies Min-Heap or Divide-and-Conquer but struggles with heap node replacement or null heads.',
+        keyIndicators: [
+          'Understands O(N log k)',
+          'Struggles with empty input lists',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Implements Min-Heap or Divide-and-Conquer with clean O(N log k) time and handles all empty list edge cases.',
+        keyIndicators: [
+          'Min-heap insertion and poll',
+          'O(N log k) complexity analysis',
+          'Handles k=0 and empty nodes',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Explains cache locality of tournament trees vs binary heaps, and analyzes external k-way merge for large datasets.',
+        keyIndicators: [
+          'Loser tree / tournament tree analysis',
+          'Cache line considerations',
+          'External sorting discussion',
+        ],
+      },
+    ],
+  },
+  {
+    competencySlug: 'sde_dsa_problem_solving',
+    domain: ProfessionalDomain.SDE,
+    companyCategories: [
+      CompanyCategory.FAANG_STYLE,
+      CompanyCategory.PRODUCT_COMPANY,
+    ],
+    experienceLevels: [
+      ExperienceLevel.SDE_1,
+      ExperienceLevel.SDE_2,
+      ExperienceLevel.SENIOR,
+    ],
+    difficulty: InterviewDifficulty.MEDIUM,
+    title: 'Course Schedule & Topological Dependency Resolution',
+    stem: 'There are a total of numCourses courses you have to take, labeled 0 to numCourses - 1. You are given an array prerequisites where prerequisites[i] = [a, b] indicates that you must take course b before course a. Return true if you can finish all courses. How do you detect cycles in directed graphs?',
+    contextPrompt:
+      'Candidate must demonstrate graph modeling as a Directed Graph, cycle detection using Kahn algorithm (BFS with in-degrees) or 3-color DFS (visiting/visited states).',
+    expectedConcepts: [
+      'Directed graph modeling: vertices = courses, directed edges = prerequisites',
+      'Cycle detection: if a cycle exists, topological ordering is impossible',
+      'Kahn algorithm: compute in-degrees, queue nodes with in-degree 0, decrement neighbors, count processed nodes',
+      'DFS cycle detection with tri-color state: UNVISITED (0), VISITING (1), VISITED (2)',
+      'Time complexity O(V + E) and space complexity O(V + E) for adjacency list and state trackers',
+    ],
+    commonMisconceptions: [
+      'Simple boolean visited array in DFS (fails because cross-edges in DAG are marked visited without forming cycles)',
+      'Ignoring disconnected subgraphs or standalone courses with zero prerequisites',
+    ],
+    probingQuestions: [
+      {
+        id: 'probe-course-1',
+        probeText:
+          'Why does a single boolean visited array fail for cycle detection in a directed graph, whereas it works in an undirected graph?',
+        targetConcept:
+          'Distinguishing between back-edges (cycles) and cross/forward-edges in directed graphs',
+        triggerCondition: 'superficial_explanation' as const,
+      },
+      {
+        id: 'probe-course-2',
+        probeText:
+          'If the interviewer asks you to return the exact order of courses to take instead of just a boolean, how does your algorithm change?',
+        targetConcept: 'Topological sort order extraction (Course Schedule II)',
+        triggerCondition: 'deep_dive' as const,
+      },
+    ],
+    rubricGuide: [
+      {
+        rating: EvaluationRating.POOR,
+        description:
+          'Cannot represent problem as graph or suggests naive recursion without cycle tracking.',
+        keyIndicators: [
+          'Cannot formulate adjacency list',
+          'Confuses tree with directed graph',
+        ],
+      },
+      {
+        rating: EvaluationRating.DEVELOPING,
+        description:
+          'Understands cycle detection but uses 2-state boolean array causing false cycle detections on cross-edges.',
+        keyIndicators: [
+          '2-state visited bug',
+          'Struggles with in-degree calculation',
+        ],
+      },
+      {
+        rating: EvaluationRating.PROFICIENT,
+        description:
+          'Implements Kahn algorithm or 3-color DFS with clear O(V + E) time and space complexity.',
+        keyIndicators: [
+          'Kahn BFS with in-degree queue OR 3-color DFS',
+          'O(V + E) complexity analysis',
+          'Handles disconnected components',
+        ],
+      },
+      {
+        rating: EvaluationRating.STRONG,
+        description:
+          'Extends to Course Schedule II, discusses parallel course scheduling (longest path in DAG), and compares DFS recursion stack depth with BFS queue memory.',
+        keyIndicators: [
+          'Topological sort order extraction',
+          'Critical path method discussion',
+          'Memory layout comparison',
+        ],
+      },
+    ],
+  },
+  {
     competencySlug: 'sde_system_design',
     domain: ProfessionalDomain.SDE,
     companyCategories: [
