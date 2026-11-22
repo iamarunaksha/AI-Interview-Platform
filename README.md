@@ -168,11 +168,36 @@ JWT_REFRESH_SECRET=dev-jwt-refresh-secret-replace-in-production-min-32-chars
 # CORS (Frontend URL)
 CORS_ORIGIN=http://localhost:3000,http://127.0.0.1:3000
 
-# AI Configuration (Optional: leaving empty automatically runs in offline Mock mode)
+# AI Provider Configuration (Default: Gemini 2.0 Flash)
 REALTIME_PROVIDER=gemini
 LLM_PROVIDER=gemini
+EVALUATION_PROVIDER=gemini
+
+# Provider API Keys
+# Google Gemini (Free API Key available at https://aistudio.google.com/app/apikey)
 GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.0-flash
+GEMINI_LIVE_MODEL=gemini-2.0-flash-exp
+
+# Optional: Deepgram Voice (https://console.deepgram.com/)
+DEEPGRAM_API_KEY=
+
+# Optional: OpenAI (https://platform.openai.com/api-keys)
+OPENAI_API_KEY=
 ```
+
+#### How to Obtain Your Free Google Gemini API Key:
+1. Navigate to **[Google AI Studio](https://aistudio.google.com/app/apikey)** and sign in with your Google account.
+2. Click **"Create API Key"** and select or create a Google Cloud project (free tier is automatically enabled).
+3. Copy the generated key string (starts with `AIzaSy...`).
+4. Paste it into `apps/api/.env`:
+   ```bash
+   GEMINI_API_KEY=AIzaSyYourGeneratedGeminiKeyHere
+   ```
+5. Restart your backend server (`pnpm dev:api`). You will see:
+   `[GeminiLlmAdapter] ✅ Gemini provider initialized with model gemini-2.0-flash` in the terminal logs!
+
+> 💡 **Offline Development Mode:** If `GEMINI_API_KEY` is omitted, the platform automatically falls back to the built-in, context-aware `MockAiAdapter`. You can test full interview rounds, live code execution, progressive hints, and rubrics completely offline with zero API keys or costs!
 
 #### Frontend (`apps/web/.env.local`) Highlights:
 

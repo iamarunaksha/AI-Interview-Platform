@@ -282,6 +282,7 @@ export class InterviewService implements OnModuleDestroy {
     // Return existing bridge if already active
     const existing = this.activeRealtimeSessions.get(sessionId);
     if (existing) {
+      this.sessionEventCallbacks.set(sessionId, onEvent);
       existing.onEvent(onEvent);
       return existing;
     }

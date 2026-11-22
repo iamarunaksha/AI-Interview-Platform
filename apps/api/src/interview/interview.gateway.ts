@@ -197,7 +197,6 @@ export class InterviewGateway
       await this.interviewService.createRealtimeBridge(
         sessionId,
         (event: ConversationEvent) => {
-          // Emit specifically typed event as well as generic conversation.event
           client.emit(event.type, event);
           client.emit('conversation.event', event);
         },

@@ -253,7 +253,7 @@ class GeminiLiveSessionWrapper implements IRealtimeSession {
   }
 
   onEvent(handler: (event: ConversationEvent) => void): void {
-    this.eventHandlers.push(handler);
+    this.eventHandlers = [handler];
   }
 
   private emit(event: ConversationEvent) {
