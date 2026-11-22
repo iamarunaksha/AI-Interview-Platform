@@ -82,13 +82,13 @@ export class DeepgramAdapter {
     text: string,
     model = 'aura-asteria-en',
   ): Promise<Buffer> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured || !text.trim()) {
       return Buffer.from([]);
     }
 
     try {
       const response = await fetch(
-        `https://api.deepgram.com/v1/speak?model=${model}`,
+        `https://api.deepgram.com/v1/speak?model=${model}&encoding=linear16&sample_rate=24000`,
         {
           method: 'POST',
           headers: {
@@ -107,7 +107,7 @@ export class DeepgramAdapter {
       return Buffer.from(arrayBuffer);
     } catch (err) {
       this.logger.error('Deepgram TTS failed:', err);
-      throw err;
+      return Buffer.from([]);
     }
   }
 }

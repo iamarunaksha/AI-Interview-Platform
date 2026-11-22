@@ -31,6 +31,11 @@ export class GeminiLlmAdapter implements ILlmProvider, IEvaluationProvider {
   private readonly logger = new Logger(GeminiLlmAdapter.name);
   private readonly client: GoogleGenAI | null = null;
   private readonly fallbackMock: MockAiAdapter;
+  private readonly fallbackModels = [
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-1.5-flash',
+  ];
 
   readonly name = 'gemini';
   readonly modelName: string;
@@ -41,7 +46,7 @@ export class GeminiLlmAdapter implements ILlmProvider, IEvaluationProvider {
     const apiKey = configService.get<string>('GEMINI_API_KEY', '').trim();
     this.modelName = configService.get<string>(
       'GEMINI_MODEL',
-      'gemini-2.0-flash',
+      'gemini-3.1-flash-lite',
     );
 
     if (apiKey) {
@@ -62,15 +67,39 @@ export class GeminiLlmAdapter implements ILlmProvider, IEvaluationProvider {
   async testConnection(): Promise<boolean> {
     if (!this.client || !this.isConfigured) return false;
     try {
-      const res = await this.client.models.generateContent({
-        model: this.modelName,
-        contents: 'ping',
-      });
+      const res = await this.executeWithModelFallback(async (model) =>
+        this.client!.models.generateContent({
+          model,
+          contents: 'ping',
+        }),
+      );
       return !!res.text;
     } catch (err) {
       this.logger.error(`Gemini connection test failed:`, err);
       return false;
     }
+  }
+
+  private async executeWithModelFallback<T>(
+    operation: (model: string) => Promise<T>,
+  ): Promise<T> {
+    const candidateModels = Array.from(
+      new Set([this.modelName, ...this.fallbackModels]),
+    );
+
+    let lastError: unknown;
+    for (const model of candidateModels) {
+      try {
+        return await operation(model);
+      } catch (err) {
+        lastError = err;
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Gemini model '${model}' attempt failed (${msg.slice(0, 120)}), trying fallback...`,
+        );
+      }
+    }
+    throw lastError;
   }
 
   // ── ILlmProvider implementation ──────────────────────────
@@ -84,17 +113,19 @@ export class GeminiLlmAdapter implements ILlmProvider, IEvaluationProvider {
     }
 
     try {
-      const response = await this.client.models.generateContent({
-        model: this.modelName,
-        contents: prompt,
-        config: {
-          systemInstruction: options?.systemInstruction,
-          temperature: options?.temperature ?? 0.7,
-          maxOutputTokens: options?.maxTokens,
-          responseMimeType: options?.responseMimeType,
-          stopSequences: options?.stopSequences,
-        },
-      });
+      const response = await this.executeWithModelFallback(async (model) =>
+        this.client!.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            systemInstruction: options?.systemInstruction,
+            temperature: options?.temperature ?? 0.7,
+            maxOutputTokens: options?.maxTokens,
+            responseMimeType: options?.responseMimeType,
+            stopSequences: options?.stopSequences,
+          },
+        }),
+      );
 
       return {
         text: response.text ?? '',
@@ -136,16 +167,18 @@ export class GeminiLlmAdapter implements ILlmProvider, IEvaluationProvider {
       options?.systemInstruction ?? systemMessage;
 
     try {
-      const response = await this.client.models.generateContent({
-        model: this.modelName,
-        contents,
-        config: {
-          systemInstruction: effectiveSystemInstruction,
-          temperature: options?.temperature ?? 0.7,
-          maxOutputTokens: options?.maxTokens,
-          responseMimeType: options?.responseMimeType,
-        },
-      });
+      const response = await this.executeWithModelFallback(async (model) =>
+        this.client!.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction: effectiveSystemInstruction,
+            temperature: options?.temperature ?? 0.7,
+            maxOutputTokens: options?.maxTokens,
+            responseMimeType: options?.responseMimeType,
+          },
+        }),
+      );
 
       return {
         text: response.text ?? '',
@@ -252,14 +285,16 @@ Return ONLY valid JSON matching this schema:
 }`;
 
     try {
-      const response = await this.client.models.generateContent({
-        model: this.modelName,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.2, // low temperature for objective evaluation
-        },
-      });
+      const response = await this.executeWithModelFallback(async (model) =>
+        this.client!.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            temperature: 0.2, // low temperature for objective evaluation
+          },
+        }),
+      );
 
       const parsed = JSON.parse(response.text ?? '{}');
       return {

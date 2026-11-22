@@ -104,6 +104,13 @@ export class InterviewOrchestratorService {
   }
 
   /**
+   * Check candidate transcript against safety and focus guardrails.
+   */
+  checkGuardrails(candidateText: string) {
+    return this.contextInjector.checkGuardrails(candidateText);
+  }
+
+  /**
    * Build the initial system instruction for a session.
    */
   getInitialInstruction(session: InterviewSessionEntity): string {

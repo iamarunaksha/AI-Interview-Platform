@@ -35,6 +35,11 @@ export class AudioPlayerPipeline {
   private lastSpokenText = "";
   private lastSpokenTimestamp = 0;
 
+  /**
+   * Optional listener invoked when speech synthesis or audio playback starts or ends.
+   */
+  public onSpeakingChange?: (isSpeaking: boolean) => void;
+
   constructor() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.onvoiceschanged = () => {
@@ -113,8 +118,8 @@ export class AudioPlayerPipeline {
   }
 
   /**
-   * Play 16-bit PCM mono audio chunk (e.g. from Gemini or Deepgram)
-   * Scheduled sequentially on the Web Audio timeline to prevent overlapping metallic stutter.
+   * Play audio chunk (Deepgram linear16 WAV or raw PCM)
+   * Scheduled sequentially on the Web Audio timeline to prevent overlapping stutter.
    */
   async playPcmChunk(
     pcmData: Uint8Array | ArrayBuffer,
@@ -133,32 +138,47 @@ export class AudioPlayerPipeline {
               pcmData.byteOffset + pcmData.byteLength,
             );
 
-      const int16 = new Int16Array(buffer);
-      if (int16.length === 0) return;
+      const u8 = new Uint8Array(buffer);
+      // Check for RIFF/WAV header ('RIFF')
+      const isRiffWav =
+        u8.length >= 12 &&
+        u8[0] === 0x52 &&
+        u8[1] === 0x49 &&
+        u8[2] === 0x46 &&
+        u8[3] === 0x46;
 
-      const float32 = new Float32Array(int16.length);
-      for (let i = 0; i < int16.length; i++) {
-        float32[i] = int16[i] / 32768.0;
+      let audioBuffer: AudioBuffer;
+      if (isRiffWav) {
+        audioBuffer = await ctx.decodeAudioData(buffer.slice(0) as ArrayBuffer);
+      } else {
+        const int16 = new Int16Array(buffer);
+        if (int16.length === 0) return;
+
+        const float32 = new Float32Array(int16.length);
+        for (let i = 0; i < int16.length; i++) {
+          float32[i] = int16[i] / 32768.0;
+        }
+
+        audioBuffer = ctx.createBuffer(1, float32.length, sampleRate);
+        audioBuffer.copyToChannel(float32, 0);
       }
-
-      const audioBuffer = ctx.createBuffer(1, float32.length, sampleRate);
-      audioBuffer.copyToChannel(float32, 0);
 
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(ctx.destination);
 
       const now = ctx.currentTime;
-      // Schedule sequentially: if nextPcmStartTime is in the past, start now; otherwise queue right after previous chunk
       const startTime = Math.max(now, this.nextPcmStartTime);
       source.start(startTime);
       this.nextPcmStartTime = startTime + audioBuffer.duration;
       this.isSpeaking = true;
       this.hasReceivedPcmThisTurn = true;
+      this.onSpeakingChange?.(true);
 
       source.onended = () => {
         if (ctx.currentTime >= this.nextPcmStartTime - 0.05) {
           this.isSpeaking = false;
+          this.onSpeakingChange?.(false);
         }
       };
     } catch (err) {
@@ -224,13 +244,16 @@ export class AudioPlayerPipeline {
 
       utterance.onstart = () => {
         this.isSpeaking = true;
+        this.onSpeakingChange?.(true);
       };
       utterance.onend = () => {
         this.isSpeaking = false;
+        this.onSpeakingChange?.(false);
         onEnd?.();
       };
       utterance.onerror = () => {
         this.isSpeaking = false;
+        this.onSpeakingChange?.(false);
         onEnd?.();
       };
 
@@ -238,6 +261,7 @@ export class AudioPlayerPipeline {
     } catch (err) {
       console.warn("SpeechSynthesis error:", err);
       this.isSpeaking = false;
+      this.onSpeakingChange?.(false);
       onEnd?.();
     }
   }
@@ -253,6 +277,7 @@ export class AudioPlayerPipeline {
     this.nextPcmStartTime = 0;
     this.isSpeaking = false;
     this.hasReceivedPcmThisTurn = false;
+    this.onSpeakingChange?.(false);
   }
 
   getIsSpeaking(): boolean {

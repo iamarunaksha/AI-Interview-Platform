@@ -34,6 +34,7 @@ import {
 } from '@interviewai/shared-types';
 import type { CreateInterviewSessionDto } from './dto/create-interview.dto.js';
 import { CodingService } from '../coding/coding.service.js';
+import { DeepgramAdapter } from '../ai/adapters/deepgram.adapter.js';
 
 @Injectable()
 export class InterviewService implements OnModuleDestroy {
@@ -52,6 +53,19 @@ export class InterviewService implements OnModuleDestroy {
     { isCameraActive: boolean; layoutMode?: VideoLayoutMode }
   >();
   private readonly transcriptQueues = new Map<string, Promise<void>>();
+  private readonly candidateAudioBuffers = new Map<
+    string,
+    {
+      chunks: Buffer[];
+      silenceTimer: NodeJS.Timeout | null;
+      lastProcessTime: number;
+      isProcessing: boolean;
+    }
+  >();
+  private readonly recentProcessedTexts = new Map<
+    string,
+    { text: string; timestamp: number }
+  >();
 
   constructor(
     @InjectRepository(InterviewSessionEntity)
@@ -64,6 +78,8 @@ export class InterviewService implements OnModuleDestroy {
     private readonly evidenceService?: EvidenceService,
     @Optional()
     private readonly codingService?: CodingService,
+    @Optional()
+    private readonly deepgramAdapter?: DeepgramAdapter,
   ) {}
 
   /**
@@ -342,7 +358,18 @@ export class InterviewService implements OnModuleDestroy {
           ? `Hello! Welcome to your technical interview today. My name is Alex from the engineering team. Today's session is a 45-minute Data Structures & Algorithms round for the role of ${session.targetRole}. We'll collaborate in the code editor, and I want to see how you break down problems, consider trade-offs, and write clean, working code. How are you doing today? Whenever you're ready, let me know and we'll dive right in.`
           : `Hello! Welcome to your technical interview today. My name is Alex from the engineering team. Today's session is a technical architecture and system design round for the role of ${session.targetRole}. How are you doing today? Whenever you're ready, let me know and we'll dive in.`;
 
-      setTimeout(() => {
+      setTimeout(async () => {
+        let audioBuf: Buffer | null = null;
+        if (this.deepgramAdapter?.isConfigured) {
+          try {
+            audioBuf = await this.deepgramAdapter.synthesizeSpeech(greetingText);
+          } catch (err) {
+            this.logger.warn(
+              `Deepgram greeting synthesis notice: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
+
         const turn = {
           id: `turn-ast-${Date.now()}`,
           role: MessageRole.ASSISTANT,
@@ -355,6 +382,13 @@ export class InterviewService implements OnModuleDestroy {
           text: greetingText,
           timestamp: Date.now(),
         });
+        if (audioBuf && audioBuf.length > 0) {
+          onEvent({
+            type: 'assistant.audio.chunk',
+            audio: new Uint8Array(audioBuf),
+            timestamp: Date.now(),
+          });
+        }
         onEvent({
           type: 'turn.completed',
           timestamp: Date.now(),
@@ -371,6 +405,24 @@ export class InterviewService implements OnModuleDestroy {
           text: event.text,
           timestamp: event.timestamp,
         });
+
+        // Synthesize assistant voice using Deepgram if configured
+        if (this.deepgramAdapter?.isConfigured) {
+          void this.deepgramAdapter
+            .synthesizeSpeech(event.text)
+            .then((audioBuf) => {
+              if (audioBuf && audioBuf.length > 0) {
+                onEvent({
+                  type: 'assistant.audio.chunk',
+                  audio: new Uint8Array(audioBuf),
+                  timestamp: Date.now(),
+                });
+              }
+            })
+            .catch((err) => {
+              this.logger.warn(`Deepgram turn synthesis notice: ${err}`);
+            });
+        }
       } else if (event.type === 'candidate.transcript.final') {
         void this.appendTranscriptTurn(sessionId, {
           id: `turn-cnd-${Date.now()}`,
@@ -436,7 +488,7 @@ export class InterviewService implements OnModuleDestroy {
   }
 
   /**
-   * Forward client microphone PCM chunk to the AI real-time session.
+   * Forward client microphone PCM chunk to the AI real-time session and Deepgram STT buffer.
    */
   async sendClientAudio(
     sessionId: string,
@@ -446,12 +498,149 @@ export class InterviewService implements OnModuleDestroy {
     if (bridge) {
       await bridge.sendAudio(chunk);
     }
+
+    if (!this.deepgramAdapter || !this.deepgramAdapter.isConfigured) {
+      return;
+    }
+
+    const chunkBuf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    let sessionBuffer = this.candidateAudioBuffers.get(sessionId);
+    if (!sessionBuffer) {
+      sessionBuffer = {
+        chunks: [],
+        silenceTimer: null,
+        lastProcessTime: 0,
+        isProcessing: false,
+      };
+      this.candidateAudioBuffers.set(sessionId, sessionBuffer);
+    }
+
+    sessionBuffer.chunks.push(chunkBuf);
+
+    // Debounce silence: after 1100ms of no audio chunks, candidate has finished speaking
+    if (sessionBuffer.silenceTimer) {
+      clearTimeout(sessionBuffer.silenceTimer);
+    }
+
+    sessionBuffer.silenceTimer = setTimeout(async () => {
+      const current = this.candidateAudioBuffers.get(sessionId);
+      if (!current || current.isProcessing || current.chunks.length === 0) return;
+
+      current.isProcessing = true;
+      const accumulated = Buffer.concat(current.chunks);
+      current.chunks = [];
+
+      try {
+        if (accumulated.length >= 4000) {
+          const transcript = await this.deepgramAdapter!.transcribeAudio(
+            accumulated,
+            'audio/webm',
+          );
+          const clean = transcript.trim();
+          if (clean.length > 0) {
+            this.logger.log(
+              `[Deepgram STT] Transcribed: "${clean}" for session ${sessionId}`,
+            );
+            const callback = this.sessionEventCallbacks.get(sessionId);
+            if (callback) {
+              callback({
+                type: 'candidate.transcript.final',
+                text: clean,
+                timestamp: Date.now(),
+              });
+            }
+            await this.sendClientText(sessionId, clean);
+          }
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Deepgram STT transcription notice for ${sessionId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      } finally {
+        current.isProcessing = false;
+      }
+    }, 1100);
   }
 
   /**
    * Forward client text (typing / chat) to the AI real-time session.
    */
   async sendClientText(sessionId: string, text: string): Promise<void> {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+
+    // Deduplicate rapid repeat submissions (e.g. if both STT and typed submit fire within 3s)
+    const lastProcessed = this.recentProcessedTexts.get(sessionId);
+    const now = Date.now();
+    if (
+      lastProcessed &&
+      lastProcessed.text.toLowerCase().trim() === cleanText.toLowerCase() &&
+      now - lastProcessed.timestamp < 3000
+    ) {
+      this.logger.debug(`Skipping duplicate transcript turn: "${cleanText}"`);
+      return;
+    }
+    this.recentProcessedTexts.set(sessionId, { text: cleanText, timestamp: now });
+
+    // ── STRICT INTERVIEW GUARDRAILS CHECK ──────────────────────────────
+    // 1. Refuse direct answers / full solutions requested by candidate.
+    // 2. Reject out-of-context prompts (weather, sports, politics, jailbreak).
+    const guardrail = this.orchestrator.checkGuardrails(cleanText);
+    if (guardrail.triggered && guardrail.response) {
+      const reply = guardrail.response;
+      this.logger.log(
+        `[Interview Guardrail] Triggered '${guardrail.type}' in session ${sessionId}`,
+      );
+
+      // Record candidate turn
+      await this.appendTranscriptTurn(sessionId, {
+        id: `turn-cnd-${Date.now()}`,
+        role: MessageRole.CANDIDATE,
+        text: cleanText,
+        timestamp: Date.now(),
+      });
+
+      // Record assistant guardrail deflection
+      await this.appendTranscriptTurn(sessionId, {
+        id: `turn-ast-${Date.now()}`,
+        role: MessageRole.ASSISTANT,
+        text: reply,
+        timestamp: Date.now(),
+      });
+
+      const callback = this.sessionEventCallbacks.get(sessionId);
+      if (callback) {
+        callback({
+          type: 'assistant.transcript.final',
+          text: reply,
+          timestamp: Date.now(),
+        });
+
+        if (this.deepgramAdapter?.isConfigured) {
+          try {
+            const audioBuf = await this.deepgramAdapter.synthesizeSpeech(reply);
+            if (audioBuf && audioBuf.length > 0) {
+              callback({
+                type: 'assistant.audio.chunk',
+                audio: new Uint8Array(audioBuf),
+                timestamp: Date.now(),
+              });
+            }
+          } catch (err) {
+            this.logger.warn(
+              `Deepgram guardrail speech notice: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
+
+        callback({
+          type: 'turn.completed',
+          timestamp: Date.now(),
+        });
+      }
+      return;
+    }
+
     let bridge = this.activeRealtimeSessions.get(sessionId);
     if (!bridge) {
       // Await briefly in case bridge is currently connecting
@@ -467,7 +656,7 @@ export class InterviewService implements OnModuleDestroy {
       await this.appendTranscriptTurn(sessionId, {
         id: `turn-cnd-${Date.now()}`,
         role: MessageRole.CANDIDATE,
-        text,
+        text: cleanText,
         timestamp: Date.now(),
       });
 
@@ -476,7 +665,7 @@ export class InterviewService implements OnModuleDestroy {
       const currentCode = this.getSessionCode(sessionId);
       const orchResult = await this.orchestrator.processCandidateTurn(
         session,
-        text,
+        cleanText,
         currentCode,
       );
       const callback = this.sessionEventCallbacks.get(sessionId);
@@ -496,14 +685,14 @@ export class InterviewService implements OnModuleDestroy {
       }
 
       // Trigger background evidence extraction for text turn
-      if (this.evidenceService && text.trim().length >= 20) {
+      if (this.evidenceService && cleanText.length >= 20) {
         void this.evidenceService
           .extractAndSaveEvidence({
             sessionId,
             turnId: `turn-cnd-${Date.now()}`,
             questionAsked:
               session.currentQuestion?.stem || 'Interview question',
-            candidateAnswer: text,
+            candidateAnswer: cleanText,
             competencyId: session.currentQuestion?.competencyId,
             expectedConcepts: session.currentQuestion?.expectedConcepts,
             commonMisconceptions: session.currentQuestion?.commonMisconceptions,
@@ -523,7 +712,7 @@ export class InterviewService implements OnModuleDestroy {
           });
       }
 
-      await bridge.sendText(text);
+      await bridge.sendText(cleanText);
     }
   }
 
@@ -549,7 +738,14 @@ export class InterviewService implements OnModuleDestroy {
       this.logger.log(`Closed realtime bridge for session ${sessionId}`);
     }
 
-    // Clean up code, video, transcript queue, and orchestrator state to eliminate memory leaks
+    // Clean up audio buffers, code, video, transcript queue, and orchestrator state
+    const audioBuf = this.candidateAudioBuffers.get(sessionId);
+    if (audioBuf?.silenceTimer) {
+      clearTimeout(audioBuf.silenceTimer);
+    }
+    this.candidateAudioBuffers.delete(sessionId);
+    this.recentProcessedTexts.delete(sessionId);
+
     this.sessionCodeMap.delete(sessionId);
     this.sessionVideoMap.delete(sessionId);
     this.transcriptQueues.delete(sessionId);
@@ -572,6 +768,13 @@ export class InterviewService implements OnModuleDestroy {
         );
       }
     }
+    for (const [, audioBuf] of this.candidateAudioBuffers.entries()) {
+      if (audioBuf.silenceTimer) {
+        clearTimeout(audioBuf.silenceTimer);
+      }
+    }
+    this.candidateAudioBuffers.clear();
+    this.recentProcessedTexts.clear();
     this.activeRealtimeSessions.clear();
     this.sessionEventCallbacks.clear();
     this.sessionCodeMap.clear();

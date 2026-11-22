@@ -326,6 +326,11 @@ export default function InterviewRoomPage({ params }: PageProps) {
   useEffect(() => {
     if (!sessionId || !session) return;
 
+    // Wire speaking state callback to drive AI avatar animation
+    audioPlayer.onSpeakingChange = (speaking) => {
+      setIsAssistantSpeaking(speaking);
+    };
+
     // Instantiate audio recorder for live volume visualizer
     const recorder = new AudioRecorderPipeline({
       onVolumeChange: (vol) => setMicVolume(vol),
@@ -400,6 +405,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
     });
 
     return () => {
+      audioPlayer.onSpeakingChange = undefined;
       recognizer.stop();
       recorder.stop();
       audioPlayer.stopAll();
