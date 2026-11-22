@@ -107,6 +107,17 @@ export class ContextInjectorService {
       isDsa,
     );
 
+    const resumeDirective =
+      session.resumeSummary && session.resumeSummary.trim().length > 0
+        ? `Candidate Resume & Background Context:
+"""
+${session.resumeSummary.slice(0, 1500)}
+"""
+Resume-Driven Customization Directives:
+1. Reference the candidate's real-world projects and technical stack when evaluating their answers.
+2. Probe into the architectural choices, scalability challenges, and failure modes of the systems they claim to have built.`
+        : '';
+
     const codeContext =
       activeCode && activeCode.code.trim().length > 0
         ? `Candidate Live Code Buffer (${activeCode.language}):
@@ -130,6 +141,7 @@ Note: The candidate is actively editing this code in their coding environment. R
 
     return [
       roleProfile,
+      resumeDirective,
       sapDirective,
       personalityDirective,
       modeDirective,

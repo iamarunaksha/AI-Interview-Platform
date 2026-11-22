@@ -14,6 +14,7 @@ interface InterviewControlsProps {
   onInterrupt: () => void;
   onTogglePause: () => void;
   onSendText: (text: string) => void;
+  onRequestHint?: () => void;
 }
 
 export function InterviewControls({
@@ -28,6 +29,7 @@ export function InterviewControls({
   onInterrupt,
   onTogglePause,
   onSendText,
+  onRequestHint,
 }: InterviewControlsProps) {
   const [textInput, setTextInput] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
@@ -136,6 +138,17 @@ export function InterviewControls({
           >
             {isPaused ? "Resume Interview" : "Pause"}
           </button>
+
+          {/* Ask for Hint (Sakshaat AI Feature) */}
+          {onRequestHint && (
+            <button
+              onClick={onRequestHint}
+              className="flex items-center gap-1.5 px-3 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              title="Request a progressive Socratic hint without spoiling the solution"
+            >
+              <span>💡 Ask for Hint</span>
+            </button>
+          )}
 
           {/* Accent Calibration Selector */}
           <div className="flex items-center gap-1.5 bg-zinc-800/80 border border-zinc-700 rounded-xl px-2.5 py-1.5 text-xs">

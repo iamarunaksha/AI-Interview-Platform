@@ -57,4 +57,8 @@ export class CreateInterviewSessionDto implements CreateInterviewSessionRequest 
   @IsOptional()
   @IsUUID()
   questionId?: string;
+
+  @IsOptional()
+  @IsString()
+  resumeSummary?: string;
 }

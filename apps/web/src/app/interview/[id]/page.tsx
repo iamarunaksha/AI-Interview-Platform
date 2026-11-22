@@ -117,6 +117,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
         break;
 
       case "assistant.response.started":
+        audioPlayer.resetTurnPcmStatus();
         setIsAssistantSpeaking(true);
         isAssistantSpeakingRef.current = true;
         setStreamingRole(MessageRole.ASSISTANT);
@@ -452,6 +453,12 @@ export default function InterviewRoomPage({ params }: PageProps) {
     setIsPaused(!isPaused);
   };
 
+  const handleRequestHint = useCallback(() => {
+    handleSendText(
+      "Could you please give me a slight hint or guidance on how to approach or optimize this?",
+    );
+  }, [handleSendText]);
+
   const handleCodeChange = (code: string, language: ProgrammingLanguage) => {
     interviewSocket.sendCodeChange(code, language);
   };
@@ -745,6 +752,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 onInterrupt={handleInterrupt}
                 onTogglePause={handleTogglePause}
                 onSendText={handleSendText}
+                onRequestHint={handleRequestHint}
               />
 
               {examinerMode && (
@@ -867,6 +875,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                   onInterrupt={handleInterrupt}
                   onTogglePause={handleTogglePause}
                   onSendText={handleSendText}
+                  onRequestHint={handleRequestHint}
                 />
               </div>
             </div>
@@ -879,6 +888,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 onCodeRun={handleCodeRun}
                 latestExecutionResult={codeExecutionResult}
                 isExecuting={isExecutingCode}
+                onRequestHint={handleRequestHint}
               />
             </div>
           </div>
@@ -895,6 +905,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 onCodeRun={handleCodeRun}
                 latestExecutionResult={codeExecutionResult}
                 isExecuting={isExecutingCode}
+                onRequestHint={handleRequestHint}
               />
             </div>
 
@@ -932,6 +943,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 onInterrupt={handleInterrupt}
                 onTogglePause={handleTogglePause}
                 onSendText={handleSendText}
+                onRequestHint={handleRequestHint}
               />
 
               <InterviewTranscript

@@ -36,6 +36,7 @@ export default function NewInterviewPage() {
     InterviewerPersonality.PROFESSIONAL,
   );
   const [mode, setMode] = useState<InterviewMode>(InterviewMode.PRACTICE);
+  const [resumeSummary, setResumeSummary] = useState("");
 
   const [questions, setQuestions] = useState<QuestionResponse[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string>("");
@@ -100,6 +101,7 @@ export default function NewInterviewPage() {
         personality,
         mode,
         questionId: selectedQuestionId || undefined,
+        resumeSummary: resumeSummary.trim() || undefined,
       });
 
       router.push(`/interview/${session.id}`);
@@ -419,6 +421,30 @@ export default function NewInterviewPage() {
                   ))}
                 </select>
               )}
+            </div>
+
+            {/* Resume & Project Context (Sakshaat AI Grilling Mode) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                  Resume &amp; Project Background (Optional)
+                </label>
+                <span className="text-[11px] text-indigo-400 font-medium">
+                  ✦ Sakshaat Project Grilling
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mb-2">
+                Paste your key projects, tech stack, or resume summary. The AI
+                interviewer will weave in targeted cross-questions about your
+                actual project architecture.
+              </p>
+              <textarea
+                value={resumeSummary}
+                onChange={(e) => setResumeSummary(e.target.value)}
+                rows={3}
+                placeholder="e.g. Built a real-time event processing pipeline with Apache Kafka, Go, and PostgreSQL. Architected microservices with Redis caching and Docker on AWS..."
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+              />
             </div>
 
             {/* Submit Action */}

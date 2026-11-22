@@ -321,6 +321,64 @@ class MockRealtimeSession implements IRealtimeSession {
       return `Great! Let's dive into the technical problem. How would you approach designing an optimal solution for this scenario?`;
     }
 
+    const questionTitle = question?.title?.toLowerCase() ?? '';
+    const questionStem = question?.stem?.toLowerCase() ?? '';
+
+    // ── CANDIDATE ASKS FOR A HINT (SAKSHAAT AI FEATURE) ──────────
+    const isHintRequest =
+      lower.includes('hint') ||
+      lower.includes('stuck') ||
+      lower.includes('clue') ||
+      lower.includes('nudge') ||
+      lower.includes('guidance');
+
+    if (isHintRequest) {
+      if (
+        questionTitle.includes('two sum') ||
+        questionStem.includes('two sum')
+      ) {
+        return `Certainly! Here is a hint: Instead of searching the whole array for every number in O(N²), think about using a hash map to remember numbers you've already seen as you iterate. For each number, ask: "What complement value would add up to target, and is it already in my map?"`;
+      }
+      if (
+        questionTitle.includes('substring') ||
+        questionStem.includes('substring')
+      ) {
+        return `Sure! Think of a sliding window with two pointers: a right pointer expanding the window, and a left pointer that marks the start. If you store the last seen index of each character in a hash map, how can you immediately jump the left pointer forward past any duplicate in O(1) time?`;
+      }
+      if (
+        questionTitle.includes('parentheses') ||
+        questionTitle.includes('bracket') ||
+        questionStem.includes('parentheses')
+      ) {
+        return `Here is a clue: When matching nested brackets, the most recently opened bracket must be the first one closed. What Last-In-First-Out (LIFO) data structure allows you to push open brackets and pop them when matching closing brackets appear?`;
+      }
+      if (
+        questionTitle.includes('merge k') ||
+        questionStem.includes('merge k')
+      ) {
+        return `Consider this: Since each individual list is already sorted, you only ever need to find the minimum element among the current heads of the k lists. What data structure allows you to insert and extract the minimum in O(log k) time?`;
+      }
+      if (
+        questionTitle.includes('course schedule') ||
+        questionStem.includes('prerequisites')
+      ) {
+        return `Think about modeling courses as vertices and prerequisites as directed edges. If you calculate the in-degree (number of incoming prerequisites) for each course, which courses can you safely take first without waiting for any prerequisites?`;
+      }
+      if (
+        questionTitle.includes('lowest common ancestor') ||
+        questionTitle.includes('binary tree')
+      ) {
+        return `Consider a post-order DFS traversal (left, right, root). If your recursive call returns a match from the left subtree AND a match from the right subtree, what does that tell you about the current root node?`;
+      }
+      if (questionTitle.includes('lru') || questionStem.includes('lru')) {
+        return `To achieve O(1) for both key lookup and eviction reordering, think of combining two data structures: a hash map for O(1) key lookups, and a doubly linked list with dummy head and tail sentinel nodes for O(1) node detachment and move-to-head.`;
+      }
+      if (isSap) {
+        return `Consider SAP Clean Core governance: if this requires custom high-throughput transactional calculations without modifying standard SAP tables, would an Embedded Steampunk RAP action on S/4HANA (Tier 2) or a Side-by-Side CAP service on BTP (Tier 3) give you the best upgrade stability?`;
+      }
+      return `Here is a hint: Think about what data structure would allow you to look up or track the state of your elements in O(1) or O(log N) time instead of repeated linear scans. What trade-off between space and time could you make here?`;
+    }
+
     // ── CANDIDATE CLARIFYING QUESTIONS (FAANG DSA & SAP) ─────────
     const isClarifyingQuestion =
       lower.includes('?') ||
@@ -342,9 +400,6 @@ class MockRealtimeSession implements IRealtimeSession {
       lower.includes('should i assume') ||
       lower.includes('what if') ||
       lower.includes('return if');
-
-    const questionTitle = question?.title?.toLowerCase() ?? '';
-    const questionStem = question?.stem?.toLowerCase() ?? '';
 
     if (isClarifyingQuestion) {
       if (

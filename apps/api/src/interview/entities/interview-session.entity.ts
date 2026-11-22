@@ -131,6 +131,9 @@ export class InterviewSessionEntity {
   @Column({ type: 'timestamptz', nullable: true })
   endedAt: Date | null;
 
+  @Column({ type: 'text', nullable: true })
+  resumeSummary: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

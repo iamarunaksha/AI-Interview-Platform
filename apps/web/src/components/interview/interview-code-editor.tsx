@@ -35,6 +35,7 @@ interface InterviewCodeEditorProps {
   ) => void;
   latestExecutionResult?: CodeExecutionResult | null;
   isExecuting?: boolean;
+  onRequestHint?: () => void;
 }
 
 export function InterviewCodeEditor({
@@ -42,6 +43,7 @@ export function InterviewCodeEditor({
   onCodeRun,
   latestExecutionResult: externalExecutionResult,
   isExecuting: externalIsExecuting,
+  onRequestHint,
 }: InterviewCodeEditorProps) {
   const [problems, setProblems] = useState<CodingProblem[]>([]);
   const [selectedProblemId, setSelectedProblemId] = useState<string>("two-sum");
@@ -241,6 +243,18 @@ export function InterviewCodeEditor({
           >
             Reset
           </button>
+
+          {/* Ask for Hint (Sakshaat AI Feature) */}
+          {onRequestHint && (
+            <button
+              type="button"
+              onClick={onRequestHint}
+              className="px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:text-white bg-indigo-500/20 hover:bg-indigo-500/30 rounded-lg border border-indigo-500/30 transition-colors"
+              title="Request a Socratic hint from the AI interviewer"
+            >
+              💡 Ask for Hint
+            </button>
+          )}
 
           {/* Run Tests Button */}
           <button

@@ -126,6 +126,7 @@ export class InterviewService implements OnModuleDestroy {
       coveredConcepts: [],
       currentQuestionId: question?.id ?? null,
       transcript: [],
+      resumeSummary: dto.resumeSummary ?? null,
     });
 
     const saved = await this.sessionRepo.save(session);
@@ -638,6 +639,7 @@ export class InterviewService implements OnModuleDestroy {
       endedAt: session.endedAt?.toISOString() ?? null,
       createdAt: session.createdAt.toISOString(),
       updatedAt: session.updatedAt.toISOString(),
+      resumeSummary: session.resumeSummary ?? null,
     };
   }
 

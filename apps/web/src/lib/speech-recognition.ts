@@ -26,16 +26,24 @@ export function normalizeTechnicalSpeech(raw: string): string {
   let cleaned = raw;
 
   const replacements: Array<[RegExp, string]> = [
-    // Phrasing idioms
+    // Phrasing idioms & greetings
     [/\b(we can|i am ready we can|let us|let's) diving\b/gi, "$1 dive in"],
     [/\bwe can diving\b/gi, "we can dive in"],
     [/\blet diving\b/gi, "let's dive in"],
     [/\bdiving in\b/gi, "dive in"],
+    [/\bready we can dive\b/gi, "ready, we can dive in"],
+    [/\byes i am ready\b/gi, "Yes, I am ready"],
+
+    // Hints & requests
+    [
+      /\b(ask for hint|can i get a hint|give me a hint|need a hint|i am stuck|i'm stuck)\b/gi,
+      "Could you give me a hint?",
+    ],
 
     // Data structures & algorithms
-    [/\b(to sum|too sum)\b/gi, "Two Sum"],
-    [/\b(rash map|as map|has map)\b/gi, "hash map"],
-    [/\b(link list|linkedlist)\b/gi, "linked list"],
+    [/\b(to sum|too sum|two some)\b/gi, "Two Sum"],
+    [/\b(rash map|as map|has map|ash map)\b/gi, "hash map"],
+    [/\b(link list|linkedlist|ling list)\b/gi, "linked list"],
     [/\bdoubly link list\b/gi, "doubly linked list"],
     [/\b(dummy note|dummy mode)\b/gi, "dummy node"],
     [/\bsentinel (note|mode)\b/gi, "sentinel node"],
@@ -51,6 +59,23 @@ export function normalizeTechnicalSpeech(raw: string): string {
     [/\b(b s t)\b/gi, "BST"],
     [/\b(b f s)\b/gi, "BFS"],
     [/\b(d f s)\b/gi, "DFS"],
+    [/\b(merge k|merge case|merge key)\b/gi, "Merge K"],
+    [/\b(course schedule|core schedule)\b/gi, "Course Schedule"],
+    [/\b(topological sort|topologic sort)\b/gi, "topological sort"],
+    [/\b(indegree|in degree)\b/gi, "in-degree"],
+    [/\b(slide window|sliding window)\b/gi, "sliding window"],
+    [/\b(sub string|substrings)\b/gi, "substring"],
+    [/\b(parentheses|parenthesis|bracket matching)\b/gi, "parentheses"],
+    [/\b(lowest common ancestor|l c a)\b/gi, "Lowest Common Ancestor"],
+
+    // SAP & Enterprise concepts
+    [/\b(acdoca|ac doca|ac docka)\b/gi, "ACDOCA"],
+    [/\b(clean core|clean-core)\b/gi, "Clean Core"],
+    [/\b(steampunk|steam punk)\b/gi, "Steampunk"],
+    [/\b(bdef|b def)\b/gi, "BDEF"],
+    [/\b(abap rap|r a p)\b/gi, "ABAP RAP"],
+    [/\b(cpi|c p i)\b/gi, "CPI"],
+    [/\b(fubr|f u b r)\b/gi, "FUBR"],
   ];
 
   for (const [pattern, replacement] of replacements) {
@@ -100,6 +125,7 @@ export class SpeechRecognitionPipeline {
   private shouldRestart = false;
   private callbacks: SpeechRecognitionCallbacks = {};
   private finalTranscriptBuffer = "";
+  private latestInterimTranscript = "";
   private silenceTimer: NodeJS.Timeout | null = null;
   private isMuted = false;
   private currentLang: SpeechAccentLocale = "en-IN";
@@ -181,33 +207,32 @@ export class SpeechRecognitionPipeline {
           }
         }
 
-        if (interim.trim()) {
-          const combined = (
-            this.finalTranscriptBuffer +
-            " " +
-            interim.trim()
-          ).trim();
-          this.callbacks.onInterimTranscript?.(
-            normalizeTechnicalSpeech(combined),
-          );
-        }
-
         if (finalSegment.trim()) {
           this.finalTranscriptBuffer = (
             this.finalTranscriptBuffer +
             " " +
             finalSegment.trim()
           ).trim();
-          const normalized = normalizeTechnicalSpeech(
-            this.finalTranscriptBuffer,
-          );
+          this.latestInterimTranscript = "";
+        } else if (interim.trim()) {
+          this.latestInterimTranscript = interim.trim();
+        }
+
+        const currentCombined = (
+          this.finalTranscriptBuffer +
+          " " +
+          this.latestInterimTranscript
+        ).trim();
+
+        if (currentCombined) {
+          const normalized = normalizeTechnicalSpeech(currentCombined);
           this.callbacks.onInterimTranscript?.(normalized);
 
-          // Reset silence timer: when candidate pauses for 1500ms after final segment, deliver turn
+          // Reset silence timer: when candidate pauses for 1400ms after speaking, deliver turn
           if (this.silenceTimer) clearTimeout(this.silenceTimer);
           this.silenceTimer = setTimeout(() => {
             this.flushFinalTranscript();
-          }, 1500);
+          }, 1400);
         }
       };
 
@@ -226,6 +251,8 @@ export class SpeechRecognitionPipeline {
 
       this.recognition.onend = () => {
         this.isListening = false;
+        // Deliver any pending spoken words before triggering onEnd
+        this.flushFinalTranscript();
         this.callbacks.onEnd?.();
         // If still supposed to be listening and not explicitly stopped, restart automatically
         if (this.shouldRestart && !this.isMuted && this.recognition) {
@@ -246,6 +273,7 @@ export class SpeechRecognitionPipeline {
     this.shouldRestart = true;
     this.isMuted = false;
     this.finalTranscriptBuffer = "";
+    this.latestInterimTranscript = "";
     if (!this.isListening) {
       try {
         this.recognition.start();
@@ -287,10 +315,15 @@ export class SpeechRecognitionPipeline {
   }
 
   private flushFinalTranscript(): void {
-    const raw = this.finalTranscriptBuffer.trim();
+    const raw = (
+      this.finalTranscriptBuffer +
+      " " +
+      this.latestInterimTranscript
+    ).trim();
     if (raw.length > 0) {
       const normalized = normalizeTechnicalSpeech(raw);
       this.finalTranscriptBuffer = "";
+      this.latestInterimTranscript = "";
       this.callbacks.onFinalTranscript?.(normalized);
       this.callbacks.onInterimTranscript?.("");
     }

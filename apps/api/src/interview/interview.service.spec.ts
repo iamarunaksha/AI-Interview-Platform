@@ -85,6 +85,7 @@ describe('InterviewService', () => {
     endedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    resumeSummary: null,
   };
 
   beforeEach(() => {

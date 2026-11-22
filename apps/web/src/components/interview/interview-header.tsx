@@ -27,23 +27,38 @@ export function InterviewHeader({
   examinerMode = false,
   onToggleExaminerMode,
 }: InterviewHeaderProps) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const getInitialElapsed = React.useCallback(() => {
+    if (startedAt) {
+      const parsed = new Date(startedAt).getTime();
+      if (!isNaN(parsed) && parsed > 0) {
+        return Math.max(0, Math.floor((Date.now() - parsed) / 1000));
+      }
+    }
+    return 0;
+  }, [startedAt]);
 
+  const [elapsedSeconds, setElapsedSeconds] = useState(getInitialElapsed);
+
+  // Active running timer that ticks once per second when in progress
   useEffect(() => {
-    if (status === InterviewStatus.COMPLETED) return;
+    if (
+      status === InterviewStatus.COMPLETED ||
+      status === InterviewStatus.PAUSED
+    ) {
+      return;
+    }
 
-    // Timer begins counting immediately from startedAt or session initiation
-    const startTimestamp = startedAt
-      ? new Date(startedAt).getTime()
-      : Date.now();
-
-    const updateTimer = () => {
-      const now = Date.now();
-      setElapsedSeconds(Math.max(0, Math.floor((now - startTimestamp) / 1000)));
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
+    const interval = setInterval(() => {
+      setElapsedSeconds((prev) => {
+        if (startedAt) {
+          const parsed = new Date(startedAt).getTime();
+          if (!isNaN(parsed) && parsed > 0) {
+            return Math.max(0, Math.floor((Date.now() - parsed) / 1000));
+          }
+        }
+        return prev + 1;
+      });
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [status, startedAt]);

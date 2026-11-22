@@ -246,6 +246,7 @@ export interface CreateInterviewSessionRequest {
   personality?: InterviewerPersonality;
   mode?: InterviewMode;
   questionId?: string;
+  resumeSummary?: string;
 }
 
 export interface InterviewSessionResponse {
@@ -268,6 +269,7 @@ export interface InterviewSessionResponse {
   endedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  resumeSummary?: string | null;
 }
 
 export interface OrchestratorState {

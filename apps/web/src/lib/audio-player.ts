@@ -1,4 +1,25 @@
 /**
+ * Strip Markdown formatting (bold, headers, backticks, code blocks, lists)
+ * so speech synthesis pronounces natural conversational sentences
+ * without reading out punctuation characters ("asterisk", "backtick", etc.)
+ */
+function stripMarkdownForSpeech(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " ") // code fences
+    .replace(/`([^`]+)`/g, "$1") // inline backticks
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // bold
+    .replace(/\*([^*]+)\*/g, "$1") // italics
+    .replace(/#+\s/g, "") // headers
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // markdown links
+    .replace(/^[-*•]\s+/gm, "") // bullet points
+    .replace(/[""]/g, '"') // smart quotes
+    .replace(/['']/g, "'")
+    .replace(/\n+/g, " ") // newlines to single space
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/**
  * Browser Audio Player Pipeline.
  *
  * Plays incoming audio chunks via Web Audio API with sequential time-scheduling.
@@ -9,6 +30,7 @@ export class AudioPlayerPipeline {
   private audioContext: AudioContext | null = null;
   private isMuted = false;
   private isSpeaking = false;
+  private hasReceivedPcmThisTurn = false;
   private nextPcmStartTime = 0;
   private lastSpokenText = "";
   private lastSpokenTimestamp = 0;
@@ -132,6 +154,7 @@ export class AudioPlayerPipeline {
       source.start(startTime);
       this.nextPcmStartTime = startTime + audioBuffer.duration;
       this.isSpeaking = true;
+      this.hasReceivedPcmThisTurn = true;
 
       source.onended = () => {
         if (ctx.currentTime >= this.nextPcmStartTime - 0.05) {
@@ -145,7 +168,7 @@ export class AudioPlayerPipeline {
 
   /**
    * Speak text response via browser Web Speech API (fallback TTS).
-   * Enforces deduplication to prevent repeated questions and audio distortion.
+   * Enforces deduplication and Markdown stripping to prevent robotic symbols.
    */
   speakText(text: string, onEnd?: () => void): void {
     if (
@@ -157,8 +180,21 @@ export class AudioPlayerPipeline {
       return;
     }
 
+    // If server already delivered real PCM audio chunks for this response,
+    // skip text synthesis fallback to avoid double audio echo
+    if (this.hasReceivedPcmThisTurn) {
+      onEnd?.();
+      return;
+    }
+
     const cleanText = text.trim();
     if (!cleanText) {
+      onEnd?.();
+      return;
+    }
+
+    const spokenClean = stripMarkdownForSpeech(cleanText);
+    if (!spokenClean) {
       onEnd?.();
       return;
     }
@@ -166,19 +202,19 @@ export class AudioPlayerPipeline {
     const now = Date.now();
     // Prevent repeating the same question/text if already spoken in the last 4 seconds
     if (
-      cleanText === this.lastSpokenText &&
+      spokenClean === this.lastSpokenText &&
       now - this.lastSpokenTimestamp < 4000
     ) {
       onEnd?.();
       return;
     }
 
-    this.lastSpokenText = cleanText;
+    this.lastSpokenText = spokenClean;
     this.lastSpokenTimestamp = now;
 
     try {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const utterance = new SpeechSynthesisUtterance(spokenClean);
       const voice = this.getNaturalVoice();
       if (voice) {
         utterance.voice = voice;
@@ -206,12 +242,17 @@ export class AudioPlayerPipeline {
     }
   }
 
+  resetTurnPcmStatus(): void {
+    this.hasReceivedPcmThisTurn = false;
+  }
+
   stopAll(): void {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
     this.nextPcmStartTime = 0;
     this.isSpeaking = false;
+    this.hasReceivedPcmThisTurn = false;
   }
 
   getIsSpeaking(): boolean {

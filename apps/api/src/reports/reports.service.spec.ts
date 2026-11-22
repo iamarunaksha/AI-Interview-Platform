@@ -74,6 +74,7 @@ describe('ReportsService', () => {
     endedAt: new Date(),
     createdAt: new Date(Date.now() - 1800 * 1000),
     updatedAt: new Date(),
+    resumeSummary: null,
   };
 
   const mockCompetencyScore: CompetencyScoreEntity = {
