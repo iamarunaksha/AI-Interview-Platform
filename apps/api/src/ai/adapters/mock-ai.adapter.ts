@@ -210,8 +210,18 @@ class MockRealtimeSession implements IRealtimeSession {
   private isAssistantSpeaking = false;
   private turnCount = 0;
   private lastTurnTimestamp = 0;
+  private conversationHistory: ChatMessage[] = [];
 
   constructor(private readonly config: RealtimeSessionConfig) {
+    // Seed initial assistant greeting into history if available
+    const existing = this.config.session?.transcript || [];
+    this.conversationHistory = existing.map(
+      (t: { role: string; text: string }) => ({
+        role: t.role === 'assistant' ? 'assistant' : 'user',
+        content: t.text,
+      }),
+    );
+
     // Emit session.ready after tick
     setTimeout(() => {
       this.emit({ type: 'session.ready', timestamp: Date.now() });
@@ -235,27 +245,25 @@ class MockRealtimeSession implements IRealtimeSession {
 
     this.turnCount++;
 
+    // Track user message in persistent conversation history
+    this.conversationHistory.push({ role: 'user', content: text });
+
     let replyText = '';
 
-    // 1. If an external LLM provider (e.g. Gemini) is configured and active, try generating with LLM
+    // 1. If an external LLM provider (e.g. Gemini) is configured and active, generate with LLM
     if (
       this.config.llmProvider &&
       this.config.llmProvider.name !== 'mock' &&
       this.config.llmProvider.isConfigured
     ) {
       try {
-        const history: ChatMessage[] = (
-          this.config.session?.transcript || []
-        ).map((t: { role: string; text: string }) => ({
-          role: t.role === 'assistant' ? 'assistant' : 'user',
-          content: t.text,
-        }));
-        history.push({ role: 'user', content: text });
-
-        const result = await this.config.llmProvider.generateChat(history, {
-          systemInstruction: this.config.systemInstruction,
-          temperature: 0.7,
-        });
+        const result = await this.config.llmProvider.generateChat(
+          this.conversationHistory,
+          {
+            systemInstruction: this.config.systemInstruction,
+            temperature: 0.7,
+          },
+        );
         replyText = result.text;
       } catch (err) {
         console.warn(
@@ -265,10 +273,13 @@ class MockRealtimeSession implements IRealtimeSession {
       }
     }
 
-    // 2. If no LLM reply, use problem-aware contextual dialogue engine
+    // 2. If no LLM reply (or LLM threw), use problem-aware contextual dialogue engine
     if (!replyText) {
       replyText = this.generateContextualResponse(text);
     }
+
+    // Record assistant reply into persistent conversation history
+    this.conversationHistory.push({ role: 'assistant', content: replyText });
 
     this.emit({
       type: 'assistant.transcript.final',

@@ -579,7 +579,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
     );
   }
 
-  if (error || !session) {
+  if (!session) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-md w-full">
@@ -602,6 +602,18 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+      {error && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-300 flex items-center justify-between">
+          <span>⚠️ {error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="text-amber-400 hover:text-amber-200 ml-4 font-semibold"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <InterviewHeader
         title={`${session.targetRole} Interview`}
         targetRole={session.targetRole}

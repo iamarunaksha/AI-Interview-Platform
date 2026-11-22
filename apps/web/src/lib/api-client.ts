@@ -117,7 +117,12 @@ async function apiFetch<T>(
   });
 
   // Enterprise token refresh: on 401 unauthorized, await deduplicated refresh promise
-  if (res.status === 401 && !endpoint.includes("/auth/")) {
+  if (
+    res.status === 401 &&
+    endpoint !== "/api/auth/login" &&
+    endpoint !== "/api/auth/register" &&
+    endpoint !== "/api/auth/refresh"
+  ) {
     const newToken = await refreshAccessTokenDeduped();
     if (newToken) {
       headers.set("Authorization", `Bearer ${newToken}`);
