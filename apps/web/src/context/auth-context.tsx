@@ -40,25 +40,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const USER_CACHE_KEY = "interviewai_user";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(USER_CACHE_KEY);
-        if (cached) return JSON.parse(cached) as UserProfile;
-      } catch {
-        // ignore
-      }
-    }
-    return null;
-  });
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [candidateProfile, setCandidateProfile] =
     useState<CandidateProfileResponse | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return !localStorage.getItem(USER_CACHE_KEY);
-    }
-    return true;
-  });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const refreshProfile = useCallback(async () => {
     const token = getStoredAccessToken();
@@ -103,7 +88,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+
     const fetchInitialAuth = async () => {
+      // Restore cached user first inside async flow to prevent hydration mismatch and cascading renders
+      try {
+        const cached = localStorage.getItem(USER_CACHE_KEY);
+        if (cached && active) {
+          setUser(JSON.parse(cached) as UserProfile);
+          setIsLoading(false);
+        }
+      } catch {
+        // ignore
+      }
+
       const token = getStoredAccessToken();
       if (!token) {
         if (active) {

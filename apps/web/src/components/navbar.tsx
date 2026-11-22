@@ -1,11 +1,21 @@
 "use client";
 
+import React, { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useAuth } from "../context/auth-context";
 import { SystemHealthIndicator } from "./system-health-indicator";
 
+const emptySubscribe = () => () => {};
+
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+
+  const isAuth = isClient && isAuthenticated;
 
   return (
     <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur sticky top-0 z-50">
@@ -33,7 +43,7 @@ export function Navbar() {
             >
               Tracks & Setup
             </Link>
-            {isAuthenticated && (
+            {isAuth && (
               <Link
                 href="/dashboard"
                 className="hover:text-zinc-900 dark:hover:text-white transition-colors"
@@ -49,7 +59,7 @@ export function Navbar() {
             <SystemHealthIndicator />
           </div>
 
-          {isAuthenticated && user ? (
+          {isAuth && user ? (
             <div className="flex items-center gap-3">
               <span className="text-xs text-zinc-500 dark:text-zinc-400 hidden sm:inline">
                 Signed in as{" "}
