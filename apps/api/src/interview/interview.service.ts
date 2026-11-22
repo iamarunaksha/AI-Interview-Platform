@@ -60,6 +60,7 @@ export class InterviewService implements OnModuleDestroy {
       silenceTimer: NodeJS.Timeout | null;
       lastProcessTime: number;
       isProcessing: boolean;
+      hasVocalActivity: boolean;
     }
   >();
   private readonly recentProcessedTexts = new Map<
@@ -511,46 +512,65 @@ export class InterviewService implements OnModuleDestroy {
         silenceTimer: null,
         lastProcessTime: 0,
         isProcessing: false,
+        hasVocalActivity: false,
       };
       this.candidateAudioBuffers.set(sessionId, sessionBuffer);
     }
 
     sessionBuffer.chunks.push(chunkBuf);
 
-    // Debounce silence: after 1100ms of no audio chunks, candidate has finished speaking
+    // Compute RMS audio volume of 16-bit linear PCM chunk
+    const numSamples = Math.floor(chunkBuf.length / 2);
+    if (numSamples > 0) {
+      let sumSquares = 0;
+      for (let i = 0; i < chunkBuf.length - 1; i += 2) {
+        const sample = chunkBuf.readInt16LE(i) / 32768.0;
+        sumSquares += sample * sample;
+      }
+      const rms = Math.sqrt(sumSquares / numSamples);
+      if (rms > 0.01) {
+        sessionBuffer.hasVocalActivity = true;
+      }
+    }
+
+    // Reset silence timer on every incoming chunk
     if (sessionBuffer.silenceTimer) {
       clearTimeout(sessionBuffer.silenceTimer);
     }
 
+    // After 850ms of silence, process accumulated candidate speech
     sessionBuffer.silenceTimer = setTimeout(async () => {
       const current = this.candidateAudioBuffers.get(sessionId);
       if (!current || current.isProcessing || current.chunks.length === 0) return;
 
-      current.isProcessing = true;
       const accumulated = Buffer.concat(current.chunks);
       current.chunks = [];
+      const hadSpeech = current.hasVocalActivity;
+      current.hasVocalActivity = false;
 
+      // 16kHz 16-bit mono = 32,000 bytes/sec. Minimum 0.25s of audio (8,000 bytes) with speech energy.
+      if (!hadSpeech || accumulated.length < 8000) return;
+
+      current.isProcessing = true;
       try {
-        if (accumulated.length >= 4000) {
-          const transcript = await this.deepgramAdapter!.transcribeAudio(
-            accumulated,
-            'audio/webm',
+        const transcript = await this.deepgramAdapter!.transcribeAudio(
+          accumulated,
+          'audio/raw',
+        );
+        const clean = transcript.trim();
+        if (clean.length > 0) {
+          this.logger.log(
+            `[Deepgram STT] Transcribed candidate speech: "${clean}" for session ${sessionId}`,
           );
-          const clean = transcript.trim();
-          if (clean.length > 0) {
-            this.logger.log(
-              `[Deepgram STT] Transcribed: "${clean}" for session ${sessionId}`,
-            );
-            const callback = this.sessionEventCallbacks.get(sessionId);
-            if (callback) {
-              callback({
-                type: 'candidate.transcript.final',
-                text: clean,
-                timestamp: Date.now(),
-              });
-            }
-            await this.sendClientText(sessionId, clean);
+          const callback = this.sessionEventCallbacks.get(sessionId);
+          if (callback) {
+            callback({
+              type: 'candidate.transcript.final',
+              text: clean,
+              timestamp: Date.now(),
+            });
           }
+          await this.sendClientText(sessionId, clean);
         }
       } catch (err) {
         this.logger.warn(
@@ -559,7 +579,56 @@ export class InterviewService implements OnModuleDestroy {
       } finally {
         current.isProcessing = false;
       }
-    }, 1100);
+    }, 850);
+
+    // If accumulated buffer exceeds ~10 seconds of speech (320,000 bytes), flush immediately
+    const totalBytes = sessionBuffer.chunks.reduce(
+      (acc, c) => acc + c.length,
+      0,
+    );
+    if (totalBytes >= 320000 && !sessionBuffer.isProcessing) {
+      if (sessionBuffer.silenceTimer) {
+        clearTimeout(sessionBuffer.silenceTimer);
+        sessionBuffer.silenceTimer = null;
+      }
+      const accumulated = Buffer.concat(sessionBuffer.chunks);
+      sessionBuffer.chunks = [];
+      const hadSpeech = sessionBuffer.hasVocalActivity;
+      sessionBuffer.hasVocalActivity = false;
+
+      if (hadSpeech && accumulated.length >= 8000) {
+        sessionBuffer.isProcessing = true;
+        void (async () => {
+          try {
+            const transcript = await this.deepgramAdapter!.transcribeAudio(
+              accumulated,
+              'audio/raw',
+            );
+            const clean = transcript.trim();
+            if (clean.length > 0) {
+              this.logger.log(
+                `[Deepgram STT] Transcribed continuous candidate speech chunk: "${clean}" for session ${sessionId}`,
+              );
+              const callback = this.sessionEventCallbacks.get(sessionId);
+              if (callback) {
+                callback({
+                  type: 'candidate.transcript.final',
+                  text: clean,
+                  timestamp: Date.now(),
+                });
+              }
+              await this.sendClientText(sessionId, clean);
+            }
+          } catch (err) {
+            this.logger.warn(
+              `Deepgram STT transcription notice for ${sessionId}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          } finally {
+            sessionBuffer.isProcessing = false;
+          }
+        })();
+      }
+    }
   }
 
   /**

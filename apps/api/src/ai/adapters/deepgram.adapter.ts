@@ -41,37 +41,46 @@ export class DeepgramAdapter {
 
   /**
    * Transcribe a pre-recorded audio buffer to text.
+   * Supports raw 16kHz linear16 PCM and standard audio containers (WAV, WebM).
    */
   async transcribeAudio(
     audioBuffer: Buffer,
-    mimetype = 'audio/wav',
+    mimetype = 'audio/raw',
   ): Promise<string> {
-    if (!this.isConfigured) {
-      return '[Deepgram Mock Transcription]: Candidate explained Redis token bucket implementation.';
+    if (!this.isConfigured || audioBuffer.length === 0) {
+      return '';
     }
 
     try {
-      const response = await fetch(
-        'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Token ${this.apiKey}`,
-            'Content-Type': mimetype,
-          },
-          body: new Uint8Array(audioBuffer),
+      const isRawPcm =
+        mimetype === 'audio/raw' ||
+        mimetype === 'audio/pcm' ||
+        mimetype === 'audio/l16';
+
+      const url = isRawPcm
+        ? 'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&encoding=linear16&sample_rate=16000&channels=1'
+        : 'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true';
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${this.apiKey}`,
+          'Content-Type': isRawPcm ? 'audio/raw' : mimetype,
         },
-      );
+        body: new Uint8Array(audioBuffer),
+      });
 
       if (!response.ok) {
-        throw new Error(`Deepgram STT failed with status ${response.status}`);
+        const errText = await response.text();
+        this.logger.warn(`Deepgram STT notice (${response.status}): ${errText}`);
+        return '';
       }
 
       const json = await response.json();
       return json.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? '';
     } catch (err) {
       this.logger.error('Deepgram STT failed:', err);
-      throw err;
+      return '';
     }
   }
 

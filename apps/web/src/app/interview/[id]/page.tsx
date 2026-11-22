@@ -106,15 +106,26 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
       case "candidate.transcript.final":
         setStreamingDelta(null);
-        setTranscript((prev) => [
-          ...prev,
-          {
-            id: `turn-cnd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            role: MessageRole.CANDIDATE,
-            text: event.text,
-            timestamp: event.timestamp,
-          },
-        ]);
+        setInterimCandidateSpeech(null);
+        setTranscript((prev) => {
+          const lastTurn = prev[prev.length - 1];
+          if (
+            lastTurn &&
+            lastTurn.role === MessageRole.CANDIDATE &&
+            lastTurn.text.trim().toLowerCase() === event.text.trim().toLowerCase()
+          ) {
+            return prev;
+          }
+          return [
+            ...prev,
+            {
+              id: `turn-cnd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              role: MessageRole.CANDIDATE,
+              text: event.text,
+              timestamp: event.timestamp,
+            },
+          ];
+        });
         break;
 
       case "assistant.response.started":
@@ -324,30 +335,26 @@ export default function InterviewRoomPage({ params }: PageProps) {
     // Wire speaking state callback to drive AI avatar animation
     audioPlayer.onSpeakingChange = (speaking) => {
       setIsAssistantSpeaking(speaking);
+      isAssistantSpeakingRef.current = speaking;
     };
 
-    // Instantiate audio recorder for live volume visualizer
+    // Instantiate audio recorder for live volume visualizer and streaming 16kHz PCM
     const recorder = new AudioRecorderPipeline({
       onVolumeChange: (vol) => setMicVolume(vol),
       onAudioChunk: (chunk) => {
-        // Suppress acoustic echo: do not send audio chunks while assistant is speaking
-        if (isAssistantSpeakingRef.current) return;
         interviewSocket.sendAudioChunk(chunk);
       },
     });
     recorderRef.current = recorder;
 
-    // Instantiate native speech recognizer for transcribing candidate's actual voice (calibrated to chosen accent)
+    // Instantiate native speech recognizer for live captioning feedback
     const recognizer = new SpeechRecognitionPipeline(
       {
         onInterimTranscript: (text) => {
           setInterimCandidateSpeech(text);
         },
-        onFinalTranscript: (text) => {
+        onFinalTranscript: () => {
           setInterimCandidateSpeech(null);
-          if (text.trim()) {
-            handleSendText(text.trim());
-          }
         },
         onError: (err) => {
           console.warn("Speech recognition notice:", err);

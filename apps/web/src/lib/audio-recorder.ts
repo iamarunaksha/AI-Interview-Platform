@@ -1,8 +1,49 @@
 /**
+ * Downsample audio buffer to 16,000 Hz and convert to 16-bit linear PCM (Int16Array).
+ * Ensures 100% compatibility with Deepgram Nova-2 streaming STT without container headers.
+ */
+function downsampleAndConvertToInt16(
+  buffer: Float32Array,
+  inputSampleRate: number,
+  outputSampleRate = 16000,
+): Int16Array {
+  if (inputSampleRate === outputSampleRate) {
+    const result = new Int16Array(buffer.length);
+    for (let i = 0; i < buffer.length; i++) {
+      const s = Math.max(-1, Math.min(1, buffer[i]));
+      result[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return result;
+  }
+
+  const sampleRateRatio = inputSampleRate / outputSampleRate;
+  const newLength = Math.round(buffer.length / sampleRateRatio);
+  const result = new Int16Array(newLength);
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+    let accum = 0;
+    let count = 0;
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i];
+      count++;
+    }
+    const avg = count > 0 ? accum / count : 0;
+    const s = Math.max(-1, Math.min(1, avg));
+    result[offsetResult] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    offsetResult++;
+    offsetBuffer = nextOffsetBuffer;
+  }
+  return result;
+}
+
+/**
  * Browser Audio Recorder Pipeline.
  *
- * Captures microphone stream, computes real-time volume levels for visualizer,
- * and slices audio chunks for streaming over WebSocket.
+ * Captures microphone stream via Web Audio API, resamples to 16kHz mono linear16 PCM,
+ * computes real-time volume levels for visualizer, and streams pure PCM chunks over WebSocket.
  */
 export class AudioRecorderPipeline {
   private static activeTracks = new Set<MediaStreamTrack>();
@@ -24,9 +65,7 @@ export class AudioRecorderPipeline {
 
   private mediaStream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
-  private analyser: AnalyserNode | null = null;
-  private mediaRecorder: MediaRecorder | null = null;
-  private animationFrameId: number | null = null;
+  private processor: ScriptProcessorNode | null = null;
   private isRecording = false;
 
   constructor(
@@ -68,72 +107,50 @@ export class AudioRecorderPipeline {
       (window as unknown as { webkitAudioContext: typeof AudioContext })
         .webkitAudioContext;
     this.audioContext = new AudioContextClass();
-
     const source = this.audioContext.createMediaStreamSource(this.mediaStream);
-    this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 256;
-    source.connect(this.analyser);
+    const inputSampleRate = this.audioContext.sampleRate;
 
-    // Track volume levels
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    const updateVolume = () => {
-      if (!this.analyser || !this.isRecording) return;
-      this.analyser.getByteFrequencyData(dataArray);
+    // Buffer size 4096 gives ~85ms chunks at 48kHz, or ~256ms at 16kHz
+    const bufferSize = 4096;
+    const processor = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
+    this.processor = processor;
 
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i];
+    processor.onaudioprocess = (e) => {
+      if (!this.isRecording) return;
+      const input = e.inputBuffer.getChannelData(0);
+      const pcm16 = downsampleAndConvertToInt16(input, inputSampleRate, 16000);
+      if (pcm16.length > 0) {
+        // Compute volume level for UI visualizer
+        let sumSquares = 0;
+        for (let i = 0; i < pcm16.length; i++) {
+          const norm = pcm16[i] / 32768.0;
+          sumSquares += norm * norm;
+        }
+        const rms = Math.sqrt(sumSquares / pcm16.length);
+        const volume = Math.min(100, Math.round(rms * 250));
+        this.options?.onVolumeChange?.(volume);
+
+        // Deliver raw 16kHz 16-bit linear PCM chunk
+        this.options?.onAudioChunk?.(pcm16.buffer as ArrayBuffer);
       }
-      const average = sum / dataArray.length;
-      const normalizedVolume = Math.min(100, Math.round((average / 128) * 100));
-
-      this.options?.onVolumeChange?.(normalizedVolume);
-      this.animationFrameId = requestAnimationFrame(updateVolume);
     };
 
-    // Use MediaRecorder to slice chunks periodically (every 250ms)
-    try {
-      this.mediaRecorder = new MediaRecorder(this.mediaStream);
-      this.mediaRecorder.ondataavailable = async (e) => {
-        if (e.data.size > 0 && this.isRecording) {
-          const buffer = await e.data.arrayBuffer();
-          this.options?.onAudioChunk?.(buffer);
-        }
-      };
-      this.mediaRecorder.start(250);
-    } catch (err) {
-      console.warn("MediaRecorder chunking fallback:", err);
-    }
+    source.connect(processor);
+    processor.connect(this.audioContext.destination);
 
     this.isRecording = true;
-    updateVolume();
   }
 
   stop(): void {
     this.isRecording = false;
 
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-
-    if (this.mediaRecorder) {
-      if (this.mediaRecorder.state !== "inactive") {
-        try {
-          this.mediaRecorder.stop();
-        } catch {
-          // ignore
-        }
-      }
+    if (this.processor) {
       try {
-        this.mediaRecorder.stream?.getTracks().forEach((track) => {
-          track.stop();
-          AudioRecorderPipeline.activeTracks.delete(track);
-        });
+        this.processor.disconnect();
       } catch {
         // ignore
       }
-      this.mediaRecorder = null;
+      this.processor = null;
     }
 
     if (this.mediaStream) {
@@ -153,7 +170,6 @@ export class AudioRecorderPipeline {
       this.audioContext = null;
     }
 
-    this.analyser = null;
     this.options?.onVolumeChange?.(0);
   }
 

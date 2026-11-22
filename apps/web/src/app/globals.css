@@ -28,6 +28,9 @@ body {
 /* Ensure all clickable buttons and button-like controls show the hand pointer cursor on hover and click */
 button,
 [role="button"],
+[role="tab"],
+a,
+summary,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
@@ -41,6 +44,7 @@ input:disabled {
 }
 
 button:active:not(:disabled),
-[role="button"]:active:not([aria-disabled="true"]) {
+[role="button"]:active:not([aria-disabled="true"]),
+a:active {
   cursor: pointer;
 }
