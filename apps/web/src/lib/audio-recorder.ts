@@ -5,6 +5,23 @@
  * and slices audio chunks for streaming over WebSocket.
  */
 export class AudioRecorderPipeline {
+  private static activeTracks = new Set<MediaStreamTrack>();
+
+  /**
+   * Release and terminate every active microphone track across all audio pipelines.
+   * Guarantees microphone hardware recording indicator turns off immediately.
+   */
+  static stopAllActiveStreams(): void {
+    for (const track of AudioRecorderPipeline.activeTracks) {
+      try {
+        track.stop();
+      } catch {
+        // ignore
+      }
+    }
+    AudioRecorderPipeline.activeTracks.clear();
+  }
+
   private mediaStream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
@@ -38,6 +55,13 @@ export class AudioRecorderPipeline {
         autoGainControl: true,
       },
     });
+
+    for (const track of this.mediaStream.getTracks()) {
+      AudioRecorderPipeline.activeTracks.add(track);
+      track.onended = () => {
+        AudioRecorderPipeline.activeTracks.delete(track);
+      };
+    }
 
     const AudioContextClass =
       window.AudioContext ||
@@ -93,9 +117,19 @@ export class AudioRecorderPipeline {
       this.animationFrameId = null;
     }
 
-    if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
+    if (this.mediaRecorder) {
+      if (this.mediaRecorder.state !== "inactive") {
+        try {
+          this.mediaRecorder.stop();
+        } catch {
+          // ignore
+        }
+      }
       try {
-        this.mediaRecorder.stop();
+        this.mediaRecorder.stream?.getTracks().forEach((track) => {
+          track.stop();
+          AudioRecorderPipeline.activeTracks.delete(track);
+        });
       } catch {
         // ignore
       }
@@ -103,7 +137,14 @@ export class AudioRecorderPipeline {
     }
 
     if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
+      this.mediaStream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {
+          // ignore
+        }
+        AudioRecorderPipeline.activeTracks.delete(track);
+      });
       this.mediaStream = null;
     }
 

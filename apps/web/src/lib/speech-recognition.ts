@@ -120,6 +120,23 @@ interface SpeechRecognitionInstance {
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
 
 export class SpeechRecognitionPipeline {
+  private static activeInstances = new Set<SpeechRecognitionPipeline>();
+
+  /**
+   * Terminate all active browser speech recognition instances.
+   * Guarantees microphone is immediately released by Chrome/Safari/Edge.
+   */
+  static stopAllActiveInstances(): void {
+    for (const instance of SpeechRecognitionPipeline.activeInstances) {
+      try {
+        instance.stop();
+      } catch {
+        // ignore
+      }
+    }
+    SpeechRecognitionPipeline.activeInstances.clear();
+  }
+
   private recognition: SpeechRecognitionInstance | null = null;
   private isListening = false;
   private shouldRestart = false;
@@ -136,6 +153,7 @@ export class SpeechRecognitionPipeline {
   ) {
     this.callbacks = callbacks;
     this.currentLang = initialLang;
+    SpeechRecognitionPipeline.activeInstances.add(this);
     this.initRecognition();
   }
 
@@ -285,12 +303,22 @@ export class SpeechRecognitionPipeline {
 
   stop(): void {
     this.shouldRestart = false;
+    this.isMuted = true;
     if (this.silenceTimer) {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
     }
     this.flushFinalTranscript();
-    if (this.recognition && this.isListening) {
+    if (this.recognition) {
+      this.recognition.onend = null;
+      this.recognition.onerror = null;
+      this.recognition.onresult = null;
+      this.recognition.onstart = null;
+      try {
+        this.recognition.abort();
+      } catch {
+        // ignore
+      }
       try {
         this.recognition.stop();
       } catch {
@@ -298,6 +326,7 @@ export class SpeechRecognitionPipeline {
       }
     }
     this.isListening = false;
+    SpeechRecognitionPipeline.activeInstances.delete(this);
   }
 
   /**

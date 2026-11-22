@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { interviewSocket } from "@/lib/socket-client";
 import { AudioRecorderPipeline } from "@/lib/audio-recorder";
+import { VideoStreamPipeline } from "@/lib/video-stream";
 import { audioPlayer } from "@/lib/audio-player";
 import {
   SpeechRecognitionPipeline,
@@ -403,10 +404,33 @@ export default function InterviewRoomPage({ params }: PageProps) {
       recorder.stop();
       audioPlayer.stopAll();
       interviewSocket.disconnect();
+      VideoStreamPipeline.stopAllActiveStreams();
+      AudioRecorderPipeline.stopAllActiveStreams();
+      SpeechRecognitionPipeline.stopAllActiveInstances();
     };
     // Only connect when sessionId or initial presence of session is ready; avoid bouncing socket on status updates
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, Boolean(session), handleSocketEvent]);
+
+  // Global window unload and pagehide teardown
+  useEffect(() => {
+    const handleTeardown = () => {
+      VideoStreamPipeline.stopAllActiveStreams();
+      AudioRecorderPipeline.stopAllActiveStreams();
+      SpeechRecognitionPipeline.stopAllActiveInstances();
+      audioPlayer.stopAll();
+      interviewSocket.disconnect();
+    };
+
+    window.addEventListener("beforeunload", handleTeardown);
+    window.addEventListener("pagehide", handleTeardown);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleTeardown);
+      window.removeEventListener("pagehide", handleTeardown);
+      handleTeardown();
+    };
+  }, []);
 
   // Synchronize runtime accent calibration with active speech recognizer
   useEffect(() => {
@@ -489,6 +513,16 @@ export default function InterviewRoomPage({ params }: PageProps) {
       "Are you sure you want to conclude this interview? The session transcript will be saved for evaluation.",
     );
     if (!confirm) return;
+
+    // Immediately stop all hardware tracks (camera and microphone)
+    setIsCameraActive(false);
+    setIsMicActive(false);
+    recorderRef.current?.stop();
+    speechRecognizerRef.current?.stop();
+    audioPlayer.stopAll();
+    VideoStreamPipeline.stopAllActiveStreams();
+    AudioRecorderPipeline.stopAllActiveStreams();
+    SpeechRecognitionPipeline.stopAllActiveInstances();
 
     try {
       interviewSocket.endInterview("candidate_ended");
@@ -834,6 +868,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                   onInterrupt={handleInterrupt}
                   onTogglePause={handleTogglePause}
                   onSendText={handleSendText}
+                  onRequestHint={handleRequestHint}
                 />
                 {examinerMode && (
                   <InterviewEvidencePanel

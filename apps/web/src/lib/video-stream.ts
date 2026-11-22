@@ -18,6 +18,23 @@ export interface VideoStreamConfig {
 }
 
 export class VideoStreamPipeline {
+  private static activeTracks = new Set<MediaStreamTrack>();
+
+  /**
+   * Release and terminate every active camera track across all pipelines.
+   * Guarantees camera hardware light turns off immediately.
+   */
+  static stopAllActiveStreams(): void {
+    for (const track of VideoStreamPipeline.activeTracks) {
+      try {
+        track.stop();
+      } catch {
+        // ignore
+      }
+    }
+    VideoStreamPipeline.activeTracks.clear();
+  }
+
   private stream: MediaStream | null = null;
   private videoElement: HTMLVideoElement | null = null;
   private canvasElement: HTMLCanvasElement | null = null;
@@ -93,6 +110,12 @@ export class VideoStreamPipeline {
 
     try {
       this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+      for (const track of this.stream.getTracks()) {
+        VideoStreamPipeline.activeTracks.add(track);
+        track.onended = () => {
+          VideoStreamPipeline.activeTracks.delete(track);
+        };
+      }
       this.videoElement.muted = true;
       this.videoElement.defaultMuted = true;
       this.videoElement.playsInline = true;
@@ -240,13 +263,23 @@ export class VideoStreamPipeline {
 
     if (this.stream) {
       for (const track of this.stream.getTracks()) {
-        track.stop();
+        try {
+          track.stop();
+        } catch {
+          // ignore
+        }
+        VideoStreamPipeline.activeTracks.delete(track);
       }
       this.stream = null;
     }
 
     if (this.videoElement) {
-      this.videoElement.srcObject = null;
+      try {
+        this.videoElement.pause();
+        this.videoElement.srcObject = null;
+      } catch {
+        // ignore
+      }
     }
 
     this.canvasElement = null;

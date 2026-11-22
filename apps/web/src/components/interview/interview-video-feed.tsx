@@ -86,6 +86,7 @@ export function InterviewVideoFeed({
 
     return () => {
       pipeline.stop();
+      VideoStreamPipeline.stopAllActiveStreams();
     };
   }, [isCameraActive, selectedDeviceId, onMetricsUpdate]);
 
