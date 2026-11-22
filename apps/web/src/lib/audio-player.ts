@@ -34,6 +34,7 @@ export class AudioPlayerPipeline {
   private nextPcmStartTime = 0;
   private lastSpokenText = "";
   private lastSpokenTimestamp = 0;
+  private enableBrowserFallback = false; // Strictly disabled to ensure only single server Voice AI (Deepgram) speaks
 
   /**
    * Optional listener invoked when speech synthesis or audio playback starts or ends.
@@ -188,10 +189,11 @@ export class AudioPlayerPipeline {
 
   /**
    * Speak text response via browser Web Speech API (fallback TTS).
-   * Enforces deduplication and Markdown stripping to prevent robotic symbols.
+   * Disabled by default so browser TTS never speaks over Deepgram voice AI.
    */
   speakText(text: string, onEnd?: () => void): void {
     if (
+      !this.enableBrowserFallback ||
       this.isMuted ||
       typeof window === "undefined" ||
       !("speechSynthesis" in window)

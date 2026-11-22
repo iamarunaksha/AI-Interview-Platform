@@ -1,4 +1,8 @@
+"use client";
+
+import React, { useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/auth-context";
 import {
   ProfessionalDomain,
   CompanyCategory,
@@ -6,7 +10,17 @@ import {
   InterviewerPersonality,
 } from "@interviewai/shared-types";
 
+const emptySubscribe = () => () => {};
+
 export default function Home() {
+  const { isAuthenticated } = useAuth();
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+  const isAuth = isClient && isAuthenticated;
+
   const domains = [
     {
       id: ProfessionalDomain.SDE,
@@ -49,18 +63,37 @@ export default function Home() {
 
         {/* CTAs */}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <Link
-            href="/onboarding"
-            className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md hover:shadow-lg hover:shadow-blue-500/20 transition-all"
-          >
-            Configure Your Track &rarr;
-          </Link>
-          <Link
-            href="/register"
-            className="px-6 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm transition-colors"
-          >
-            Create Free Account
-          </Link>
+          {isAuth ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md hover:shadow-lg hover:shadow-blue-500/20 transition-all inline-flex items-center gap-2"
+              >
+                Go to Dashboard &rarr;
+              </Link>
+              <Link
+                href="/onboarding"
+                className="px-6 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm transition-colors"
+              >
+                Start New Interview
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/onboarding"
+                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md hover:shadow-lg hover:shadow-blue-500/20 transition-all"
+              >
+                Configure Your Track &rarr;
+              </Link>
+              <Link
+                href="/register"
+                className="px-6 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm transition-colors"
+              >
+                Create Free Account
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Domain Cards */}

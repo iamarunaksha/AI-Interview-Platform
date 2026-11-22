@@ -151,11 +151,6 @@ export default function InterviewRoomPage({ params }: PageProps) {
             },
           ];
         });
-        // Speak out loud via browser speech synthesis fallback
-        audioPlayer.speakText(event.text, () => {
-          setIsAssistantSpeaking(false);
-          isAssistantSpeakingRef.current = false;
-        });
         break;
 
       case "assistant.audio.chunk":
