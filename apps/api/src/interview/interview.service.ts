@@ -65,6 +65,7 @@ export class InterviewService implements OnModuleDestroy {
       lastProcessTime: number;
       isProcessing: boolean;
       hasVocalActivity: boolean;
+      speechStartedEmitted: boolean;
     }
   >();
   private readonly recentProcessedTexts = new Map<
@@ -539,17 +540,27 @@ export class InterviewService implements OnModuleDestroy {
   ): Promise<void> {
     if (!this.deepgramAdapter?.isConfigured) return;
     const language = this.sessionLanguageMap.get(sessionId) || 'en-IN';
-    const transcript = await this.deepgramAdapter.transcribeAudio(
-      accumulated,
-      'audio/raw',
-      { language },
-    );
+    let transcript = '';
+    try {
+      transcript = await this.deepgramAdapter.transcribeAudio(
+        accumulated,
+        'audio/raw',
+        { language },
+      );
+    } catch (err) {
+      this.sessionEventCallbacks.get(sessionId)?.({
+        type: 'candidate.transcript.partial',
+        text: '',
+        timestamp: Date.now(),
+      });
+      throw err;
+    }
     const clean = transcript.trim();
+    const callback = this.sessionEventCallbacks.get(sessionId);
     if (clean.length > 0) {
       this.logger.log(
         `[Deepgram STT (${language})] Transcribed candidate speech: "${clean}" for session ${sessionId}`,
       );
-      const callback = this.sessionEventCallbacks.get(sessionId);
       if (callback) {
         callback({
           type: 'candidate.transcript.final',
@@ -559,6 +570,13 @@ export class InterviewService implements OnModuleDestroy {
       }
       // Enqueued onto per-session turn queue so STT immediately unlocks for subsequent speech
       void this.sendClientText(sessionId, clean);
+    } else if (callback) {
+      // Clear "Transcribing..." UI state when Deepgram detects no speech words
+      callback({
+        type: 'candidate.transcript.partial',
+        text: '',
+        timestamp: Date.now(),
+      });
     }
   }
 
@@ -603,6 +621,7 @@ export class InterviewService implements OnModuleDestroy {
         lastProcessTime: 0,
         isProcessing: false,
         hasVocalActivity: false,
+        speechStartedEmitted: false,
       };
       this.candidateAudioBuffers.set(sessionId, sessionBuffer);
     }
@@ -620,6 +639,13 @@ export class InterviewService implements OnModuleDestroy {
       const rms = Math.sqrt(sumSquares / numSamples);
       if (rms > 0.01) {
         sessionBuffer.hasVocalActivity = true;
+        if (!sessionBuffer.speechStartedEmitted) {
+          sessionBuffer.speechStartedEmitted = true;
+          this.sessionEventCallbacks.get(sessionId)?.({
+            type: 'candidate.speech.started',
+            timestamp: Date.now(),
+          });
+        }
       }
     }
 
@@ -643,11 +669,16 @@ export class InterviewService implements OnModuleDestroy {
         current.chunks = [];
         const hadSpeech = current.hasVocalActivity;
         current.hasVocalActivity = false;
+        current.speechStartedEmitted = false;
 
         // 16kHz 16-bit mono = 32,000 bytes/sec. Minimum 0.25s of audio (8,000 bytes) with speech energy.
         if (!hadSpeech || accumulated.length < 8000) return;
 
         current.isProcessing = true;
+        this.sessionEventCallbacks.get(sessionId)?.({
+          type: 'candidate.speech.ended',
+          timestamp: Date.now(),
+        });
         try {
           await this.processAudioBufferWithDeepgram(sessionId, accumulated);
         } catch (err) {
@@ -675,9 +706,14 @@ export class InterviewService implements OnModuleDestroy {
       sessionBuffer.chunks = [];
       const hadSpeech = sessionBuffer.hasVocalActivity;
       sessionBuffer.hasVocalActivity = false;
+      sessionBuffer.speechStartedEmitted = false;
 
       if (hadSpeech && accumulated.length >= 8000) {
         sessionBuffer.isProcessing = true;
+        this.sessionEventCallbacks.get(sessionId)?.({
+          type: 'candidate.speech.ended',
+          timestamp: Date.now(),
+        });
         void (async () => {
           try {
             await this.processAudioBufferWithDeepgram(sessionId, accumulated);

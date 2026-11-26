@@ -335,6 +335,26 @@ export class InterviewGateway
   }
 
   /**
+   * Resume a paused interview.
+   */
+  @SubscribeMessage('interview.resume')
+  async handleResume(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data?: { sessionId?: string },
+  ) {
+    const sessionId = this.getAuthorizedSessionId(client, data?.sessionId);
+    if (!sessionId) return;
+
+    const updated = await this.interviewService.startSession(sessionId);
+    client.emit('interview.status', {
+      type: 'interview.status',
+      status: updated.status,
+      startedAt: updated.startedAt,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
    * Explicitly end the interview session.
    */
   @SubscribeMessage('interview.end')

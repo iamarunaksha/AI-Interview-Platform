@@ -8,6 +8,13 @@ interface InterviewTranscriptProps {
   streamingDelta?: string | null;
   streamingRole?: MessageRole | null;
   interimCandidateSpeech?: string | null;
+  processingStage?:
+    | "idle"
+    | "listening"
+    | "transcribing"
+    | "thinking"
+    | "speaking";
+  heightClassName?: string;
 }
 
 export function InterviewTranscript({
@@ -15,6 +22,8 @@ export function InterviewTranscript({
   streamingDelta,
   streamingRole,
   interimCandidateSpeech,
+  processingStage = "idle",
+  heightClassName = "h-[400px]",
 }: InterviewTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -22,10 +31,12 @@ export function InterviewTranscript({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [transcript, streamingDelta, interimCandidateSpeech]);
+  }, [transcript, streamingDelta, interimCandidateSpeech, processingStage]);
 
   return (
-    <div className="flex flex-col h-[400px] bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+    <div
+      className={`flex flex-col ${heightClassName} bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden`}
+    >
       <div className="px-5 py-3 border-b border-zinc-800/80 bg-zinc-950/40 flex items-center justify-between">
         <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
           Live Conversation Transcript
@@ -121,17 +132,44 @@ export function InterviewTranscript({
           </div>
         )}
 
-        {/* Live Candidate Speech Recognition Preview */}
-        {interimCandidateSpeech && (
+        {/* Live Candidate Speech Recognition / Deepgram STT Feedback */}
+        {(interimCandidateSpeech ||
+          processingStage === "listening" ||
+          processingStage === "transcribing") && (
           <div className="flex flex-col items-end">
             <div className="flex items-center gap-2 mb-1 px-1">
               <span className="text-[11px] font-semibold uppercase text-emerald-400 flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                You (Speaking...)
+                {processingStage === "transcribing"
+                  ? "Transcribing your speech..."
+                  : "You (Speaking...)"}
               </span>
             </div>
             <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed bg-emerald-600/20 text-emerald-100 border border-emerald-500/40 rounded-tr-sm italic">
-              {interimCandidateSpeech}
+              {interimCandidateSpeech ||
+                (processingStage === "transcribing"
+                  ? "Processing voice audio with Deepgram STT..."
+                  : "Capturing your voice...")}
+            </div>
+          </div>
+        )}
+
+        {/* AI Thinking Indicator (during Gemini LLM + Deepgram TTS latency) */}
+        {processingStage === "thinking" && !streamingDelta && (
+          <div className="flex flex-col items-start">
+            <div className="flex items-center gap-2 mb-1 px-1">
+              <span className="text-[11px] font-semibold uppercase text-indigo-400 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-ping"></span>
+                AI Interviewer (Thinking...)
+              </span>
+            </div>
+            <div className="rounded-2xl px-4 py-2.5 text-xs text-zinc-300 bg-zinc-800/80 border border-indigo-500/30 rounded-tl-sm flex items-center gap-2">
+              <span className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" />
+              </span>
+              <span>Preparing next response & voice audio...</span>
             </div>
           </div>
         )}

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
+import { useAuth } from "@/context/auth-context";
 import {
   ProfessionalDomain,
   CompanyCategory,
@@ -17,6 +18,13 @@ import {
 
 export default function NewInterviewPage() {
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   const [domain, setDomain] = useState<ProfessionalDomain>(
     ProfessionalDomain.SDE,
@@ -39,51 +47,81 @@ export default function NewInterviewPage() {
   const [resumeSummary, setResumeSummary] = useState("");
 
   const [questions, setQuestions] = useState<QuestionResponse[]>([]);
+  const [questionMatchNotice, setQuestionMatchNotice] = useState<string | null>(
+    null,
+  );
   const [selectedQuestionId, setSelectedQuestionId] = useState<string>("");
-  const [loadingQuestions, setLoadingQuestions] = useState(true);
+  const [loadedFilterKey, setLoadedFilterKey] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Fetch available questions matching current selections
+  const filterKey = `${domain}:${difficulty}:${experienceLevel}`;
+  const loadingQuestions =
+    !authLoading && isAuthenticated && loadedFilterKey !== filterKey;
+
+  // Fetch available questions matching current selections, with broader fallback
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     let active = true;
+
+    const sortQuestions = (list: QuestionResponse[]) =>
+      [...list].sort((a, b) => {
+        const aIsDsa =
+          a.competency?.slug === "sde_dsa_problem_solving" ||
+          a.competency?.name?.toLowerCase().includes("data structures");
+        const bIsDsa =
+          b.competency?.slug === "sde_dsa_problem_solving" ||
+          b.competency?.name?.toLowerCase().includes("data structures");
+        if (aIsDsa && !bIsDsa) return -1;
+        if (!aIsDsa && bIsDsa) return 1;
+        return 0;
+      });
 
     api.tracks
       .getQuestions({ domain, difficulty, experienceLevel })
-      .then((data) => {
-        if (active) {
-          // Prioritize DSA questions first for SDE candidates
-          const sorted = [...data].sort((a, b) => {
-            const aIsDsa =
-              a.competency?.slug === "sde_dsa_problem_solving" ||
-              a.competency?.name?.toLowerCase().includes("data structures");
-            const bIsDsa =
-              b.competency?.slug === "sde_dsa_problem_solving" ||
-              b.competency?.name?.toLowerCase().includes("data structures");
-            if (aIsDsa && !bIsDsa) return -1;
-            if (!aIsDsa && bIsDsa) return 1;
-            return 0;
+      .then(async (strictData) => {
+        if (!active) return;
+
+        let resolved = strictData;
+        let notice: string | null = null;
+
+        if (resolved.length === 0) {
+          const sameDifficulty = await api.tracks.getQuestions({
+            domain,
+            difficulty,
           });
-          setQuestions(sorted);
-          if (sorted.length > 0) {
-            setSelectedQuestionId(sorted[0].id);
+          if (!active) return;
+          if (sameDifficulty.length > 0) {
+            resolved = sameDifficulty;
+            notice = `No exact question bank match for ${difficulty} + ${experienceLevel}. Showing ${sameDifficulty.length} ${domain.toUpperCase()} question(s) matching ${difficulty} difficulty, or choose Adaptive AI.`;
           } else {
-            setSelectedQuestionId("");
+            const domainAll = await api.tracks.getQuestions({ domain });
+            if (!active) return;
+            resolved = domainAll;
+            if (domainAll.length > 0) {
+              notice = `No exact question bank match for ${difficulty} + ${experienceLevel}. Showing all ${domainAll.length} ${domain.toUpperCase()} question(s), or choose Adaptive AI.`;
+            }
           }
-          setLoadingQuestions(false);
         }
+
+        const sorted = sortQuestions(resolved);
+        setQuestions(sorted);
+        setQuestionMatchNotice(notice);
+        setSelectedQuestionId(sorted.length > 0 ? sorted[0].id : "");
+        setLoadedFilterKey(filterKey);
       })
       .catch((err) => {
         if (active) {
           console.error("Failed to load questions:", err);
-          setLoadingQuestions(false);
+          setQuestionMatchNotice(null);
+          setLoadedFilterKey(filterKey);
         }
       });
 
     return () => {
       active = false;
     };
-  }, [domain, difficulty, experienceLevel]);
+  }, [domain, difficulty, experienceLevel, filterKey, authLoading, isAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,7 +207,8 @@ export default function NewInterviewPage() {
                     Software Engineering (SDE)
                   </div>
                   <div className="text-xs text-zinc-400 mt-1">
-                    System Design, Concurrency, Architecture, Microservices
+                    DSA &amp; Algorithms, System Design, Concurrency,
+                    Microservices
                   </div>
                 </button>
 
@@ -404,22 +443,33 @@ export default function NewInterviewPage() {
                   Loading available questions...
                 </div>
               ) : questions.length === 0 ? (
-                <div className="text-xs text-zinc-400 bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
-                  Adaptive AI Selection: The interviewer will generate the
-                  initial problem dynamically.
+                <div className="text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl">
+                  No matching question-bank entries found. Adaptive AI Selection
+                  will dynamically generate a calibrated problem for your setup.
                 </div>
               ) : (
-                <select
-                  value={selectedQuestionId}
-                  onChange={(e) => setSelectedQuestionId(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  {questions.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      {q.title} ({q.competency?.name || "General"})
+                <div className="space-y-2">
+                  {questionMatchNotice && (
+                    <div className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-xl">
+                      {questionMatchNotice}
+                    </div>
+                  )}
+                  <select
+                    value={selectedQuestionId}
+                    onChange={(e) => setSelectedQuestionId(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    {questions.map((q) => (
+                      <option key={q.id} value={q.id}>
+                        {q.title} ({q.difficulty.toUpperCase()} •{" "}
+                        {q.competency?.name || "General"})
+                      </option>
+                    ))}
+                    <option value="">
+                      Adaptive AI Selection (Dynamic Problem)
                     </option>
-                  ))}
-                </select>
+                  </select>
+                </div>
               )}
             </div>
 

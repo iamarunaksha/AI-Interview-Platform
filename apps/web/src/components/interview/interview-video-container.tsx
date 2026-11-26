@@ -13,6 +13,7 @@ import { InterviewVideoFeed } from "./interview-video-feed";
 
 interface InterviewVideoContainerProps {
   isAssistantSpeaking: boolean;
+  isAiThinking?: boolean;
   stage?: InterviewStage;
   personality?: InterviewerPersonality;
   companyCategory?: CompanyCategory;
@@ -27,6 +28,7 @@ interface InterviewVideoContainerProps {
 
 export function InterviewVideoContainer({
   isAssistantSpeaking,
+  isAiThinking = false,
   stage,
   personality,
   companyCategory,
@@ -90,6 +92,7 @@ export function InterviewVideoContainer({
         >
           <InterviewAiAvatar
             isAssistantSpeaking={isAssistantSpeaking}
+            isAiThinking={isAiThinking}
             stage={stage}
             personality={personality}
             companyCategory={companyCategory}

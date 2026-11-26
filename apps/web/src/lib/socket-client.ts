@@ -154,6 +154,13 @@ export class InterviewSocketClient {
     });
   }
 
+  resume(): void {
+    if (!this.socket || !this.isConnected || !this.sessionId) return;
+    this.socket.emit("interview.resume", {
+      sessionId: this.sessionId,
+    });
+  }
+
   endInterview(reason = "candidate_ended"): void {
     if (!this.socket || !this.isConnected || !this.sessionId) return;
     this.socket.emit("interview.end", {

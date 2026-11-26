@@ -5,10 +5,12 @@ import type { QuestionResponse } from "@interviewai/shared-types";
 
 interface InterviewQuestionCardProps {
   question: QuestionResponse | null;
+  allowHints?: boolean;
 }
 
 export function InterviewQuestionCard({
   question,
+  allowHints = false,
 }: InterviewQuestionCardProps) {
   const [showHints, setShowHints] = useState(false);
 
@@ -29,12 +31,15 @@ export function InterviewQuestionCard({
         <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
           {question.competency?.name || "Core Technical Competency"}
         </span>
-        <button
-          onClick={() => setShowHints(!showHints)}
-          className="text-xs text-zinc-400 hover:text-zinc-200 underline cursor-pointer"
-        >
-          {showHints ? "Hide Interview Hints" : "Show Interview Hints"}
-        </button>
+        {allowHints && (
+          <button
+            type="button"
+            onClick={() => setShowHints(!showHints)}
+            className="text-xs text-zinc-400 hover:text-zinc-200 underline cursor-pointer"
+          >
+            {showHints ? "Hide Interview Hints" : "Show Interview Hints"}
+          </button>
+        )}
       </div>
 
       <h2 className="text-lg font-semibold text-zinc-100 mb-2">
@@ -45,7 +50,7 @@ export function InterviewQuestionCard({
         {question.stem}
       </p>
 
-      {showHints && (
+      {allowHints && showHints && (
         <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3">
           <div>
             <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">

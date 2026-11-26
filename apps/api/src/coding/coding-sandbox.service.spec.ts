@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CodingSandboxService } from './coding-sandbox.service.js';
+import { BUILTIN_CODING_PROBLEMS } from './coding.service.js';
 import {
   ProgrammingLanguage,
   CodeExecutionStatus,
@@ -36,12 +37,12 @@ describe('CodingSandboxService', () => {
 
   it('should successfully execute valid TypeScript solution passing all test cases', async () => {
     const validCode = `
-      function twoSum(nums, target) {
-        const map = new Map();
+      function twoSum(nums: number[], target: number): number[] {
+        const map = new Map<number, number>();
         for (let i = 0; i < nums.length; i++) {
           const complement = target - nums[i];
           if (map.has(complement)) {
-            return [map.get(complement), i];
+            return [map.get(complement)!, i];
           }
           map.set(nums[i], i);
         }
@@ -56,12 +57,30 @@ describe('CodingSandboxService', () => {
       entryFunction: 'twoSum',
     });
 
+    expect(result.language).toBe(ProgrammingLanguage.TYPESCRIPT);
     expect(result.status).toBe(CodeExecutionStatus.PASSED);
     expect(result.totalTests).toBe(3);
     expect(result.passedTests).toBe(3);
     expect(result.results).toHaveLength(3);
     expect(result.results[0].passed).toBe(true);
     expect(result.results[0].actualOutput).toEqual([0, 1]);
+  });
+
+  it('should execute all builtin TypeScript starter templates without compile errors', async () => {
+    for (const problem of BUILTIN_CODING_PROBLEMS) {
+      const tsCode = problem.starterCode[ProgrammingLanguage.TYPESCRIPT]!;
+      const result = await sandbox.execute({
+        code: tsCode,
+        language: ProgrammingLanguage.TYPESCRIPT,
+        testCases: problem.testCases,
+        entryFunction: problem.entryFunction,
+      });
+
+      expect(result.status, `Expected ${problem.id} TypeScript starter to pass`).toBe(
+        CodeExecutionStatus.PASSED,
+      );
+      expect(result.passedTests).toBe(problem.testCases.length);
+    }
   });
 
   it('should report FAILED when user logic produces incorrect results', async () => {

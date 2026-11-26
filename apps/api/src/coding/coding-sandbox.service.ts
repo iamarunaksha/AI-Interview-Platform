@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as vm from 'node:vm';
 import { spawn } from 'node:child_process';
+import { stripTypeScriptTypes } from 'node:module';
 import {
   ProgrammingLanguage,
   CodeExecutionStatus,
@@ -74,6 +75,7 @@ export class CodingSandboxService {
       case ProgrammingLanguage.TYPESCRIPT:
         return this.executeJavaScript(
           code,
+          language,
           testCases,
           entryFunction,
           startTime,
@@ -102,6 +104,7 @@ export class CodingSandboxService {
    */
   private async executeJavaScript(
     code: string,
+    language: ProgrammingLanguage,
     testCases: TestCase[],
     entryFunction?: string,
     startTime = Date.now(),
@@ -174,16 +177,38 @@ export class CodingSandboxService {
 
     const context = vm.createContext(sandbox);
 
-    // 1. Compile user code
+    // 1. Transpile TypeScript syntax (when applicable) and compile user code
+    let executableCode = code;
+    if (language === ProgrammingLanguage.TYPESCRIPT) {
+      try {
+        executableCode = stripTypeScriptTypes(code, { mode: 'transform' });
+      } catch (err) {
+        return {
+          language,
+          status: CodeExecutionStatus.COMPILE_ERROR,
+          totalTests: testCases.length,
+          passedTests: 0,
+          runtimeMs: Date.now() - startTime,
+          results: [],
+          compilerOutput:
+            err instanceof Error ? err.stack || err.message : String(err),
+          interviewerContextNote: `Candidate TypeScript code failed to compile: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    }
+
     let script: vm.Script;
     try {
-      script = new vm.Script(code, {
-        filename: 'candidate_solution.js',
+      script = new vm.Script(executableCode, {
+        filename:
+          language === ProgrammingLanguage.TYPESCRIPT
+            ? 'candidate_solution.ts'
+            : 'candidate_solution.js',
       });
       script.runInContext(context, { timeout: 1000 });
     } catch (err) {
       return {
-        language: ProgrammingLanguage.TYPESCRIPT,
+        language,
         status: CodeExecutionStatus.COMPILE_ERROR,
         totalTests: testCases.length,
         passedTests: 0,
@@ -213,7 +238,7 @@ export class CodingSandboxService {
       !this.SAFE_IDENTIFIER_REGEX.test(resolvedEntryFunction)
     ) {
       return {
-        language: ProgrammingLanguage.TYPESCRIPT,
+        language,
         status: CodeExecutionStatus.COMPILE_ERROR,
         totalTests: testCases.length,
         passedTests: 0,
@@ -305,7 +330,7 @@ export class CodingSandboxService {
     }
 
     return {
-      language: ProgrammingLanguage.TYPESCRIPT,
+      language,
       status: overallStatus,
       totalTests: testCases.length,
       passedTests: passedCount,

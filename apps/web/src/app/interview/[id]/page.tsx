@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
+import { useAuth } from "@/context/auth-context";
 import { interviewSocket } from "@/lib/socket-client";
 import { AudioRecorderPipeline } from "@/lib/audio-recorder";
 import { VideoStreamPipeline } from "@/lib/video-stream";
@@ -27,6 +28,8 @@ import { InterviewVideoFeed } from "@/components/interview/interview-video-feed"
 import {
   InterviewStatus,
   InterviewStage,
+  InterviewMode,
+  ProfessionalDomain,
   MessageRole,
   VideoLayoutMode,
   type InterviewSessionResponse,
@@ -39,12 +42,24 @@ import {
   type ProgrammingLanguage,
 } from "@interviewai/shared-types";
 
+function isDsaInterviewSession(session: InterviewSessionResponse): boolean {
+  const slug = session.currentQuestion?.competency?.slug || "";
+  if (slug === "sde_dsa_problem_solving") return true;
+  if (session.domain !== ProfessionalDomain.SDE) return false;
+  const text =
+    `${session.currentQuestion?.title || ""} ${session.currentQuestion?.stem || ""}`.toLowerCase();
+  return /two sum|lru|lowest common ancestor|parenthes|substring|merge k|course schedule|algorithm|data structure|array|tree|graph|linked list/.test(
+    text,
+  );
+}
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
 export default function InterviewRoomPage({ params }: PageProps) {
   const router = useRouter();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [session, setSession] = useState<InterviewSessionResponse | null>(null);
   const [orchestratorState, setOrchestratorState] =
@@ -59,6 +74,10 @@ export default function InterviewRoomPage({ params }: PageProps) {
   const [interimCandidateSpeech, setInterimCandidateSpeech] = useState<
     string | null
   >(null);
+  const [processingStage, setProcessingStage] = useState<
+    "idle" | "listening" | "transcribing" | "thinking" | "speaking"
+  >("idle");
+  const [showCodingTranscript, setShowCodingTranscript] = useState(true);
 
   // Examiner / Auditor Mode Toggle (default: false for distraction-free candidate experience)
   const [examinerMode, setExaminerMode] = useState(false);
@@ -96,17 +115,42 @@ export default function InterviewRoomPage({ params }: PageProps) {
   // Refs for recorders to avoid stale closures
   const recorderRef = useRef<AudioRecorderPipeline | null>(null);
   const speechRecognizerRef = useRef<SpeechRecognitionPipeline | null>(null);
+  const wasMicActiveBeforePauseRef = useRef(false);
+  const hasInitializedViewModeRef = useRef(false);
+
+  // Redirect unauthenticated visitors directly to /login
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   // Socket event handler
   const handleSocketEvent = React.useCallback((event: ConversationEvent) => {
     switch (event.type) {
       case "candidate.speech.started":
         setStreamingRole(MessageRole.CANDIDATE);
+        setProcessingStage("listening");
+        break;
+
+      case "candidate.speech.ended":
+        setProcessingStage("transcribing");
+        break;
+
+      case "candidate.transcript.partial":
+        if (!event.text) {
+          setProcessingStage((prev) =>
+            prev === "transcribing" || prev === "listening" ? "idle" : prev,
+          );
+        } else {
+          setInterimCandidateSpeech(event.text);
+        }
         break;
 
       case "candidate.transcript.final":
         setStreamingDelta(null);
         setInterimCandidateSpeech(null);
+        setProcessingStage("thinking");
         setTranscript((prev) => {
           const lastTurn = prev[prev.length - 1];
           if (
@@ -130,13 +174,15 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
       case "assistant.response.started":
         audioPlayer.resetTurnPcmStatus();
-        setIsAssistantSpeaking(true);
-        isAssistantSpeakingRef.current = true;
+        setProcessingStage((prev) =>
+          prev === "speaking" ? "speaking" : "thinking",
+        );
         setStreamingRole(MessageRole.ASSISTANT);
         setStreamingDelta("");
         break;
 
       case "assistant.transcript.delta":
+        setProcessingStage("speaking");
         setStreamingDelta((prev) => (prev ? prev + event.text : event.text));
         break;
 
@@ -167,6 +213,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
       case "assistant.audio.chunk":
         setIsAssistantSpeaking(true);
         isAssistantSpeakingRef.current = true;
+        setProcessingStage("speaking");
         void audioPlayer.playPcmChunk(event.audio);
         break;
 
@@ -174,11 +221,15 @@ export default function InterviewRoomPage({ params }: PageProps) {
         audioPlayer.stopAll();
         setIsAssistantSpeaking(false);
         isAssistantSpeakingRef.current = false;
+        setProcessingStage("idle");
         setStreamingDelta(null);
         break;
 
       case "turn.completed":
         setStreamingDelta(null);
+        if (!isAssistantSpeakingRef.current) {
+          setProcessingStage("idle");
+        }
         break;
 
       case "interview.status":
@@ -235,6 +286,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
         setIsMicActive(false);
         setIsAssistantSpeaking(false);
         isAssistantSpeakingRef.current = false;
+        setProcessingStage("idle");
         setSession((prev) =>
           prev ? { ...prev, status: InterviewStatus.COMPLETED } : null,
         );
@@ -255,7 +307,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
 
   // Load session data
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || authLoading || !isAuthenticated) return;
     let active = true;
 
     api.interviews
@@ -273,6 +325,12 @@ export default function InterviewRoomPage({ params }: PageProps) {
           }
         }
         setSession(sessionData);
+        if (!hasInitializedViewModeRef.current) {
+          hasInitializedViewModeRef.current = true;
+          if (isDsaInterviewSession(sessionData)) {
+            setViewMode("split");
+          }
+        }
         setTranscript(sessionData.transcript || []);
         setIsPaused(sessionData.status === InterviewStatus.PAUSED);
         setLoading(false);
@@ -293,9 +351,13 @@ export default function InterviewRoomPage({ params }: PageProps) {
       })
       .catch((err) => {
         if (active) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load interview",
-          );
+          const msg =
+            err instanceof Error ? err.message : "Failed to load interview";
+          if (/unauthorized|401|authentication/i.test(msg)) {
+            router.push("/login");
+            return;
+          }
+          setError(msg);
           setLoading(false);
         }
       });
@@ -303,7 +365,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
     return () => {
       active = false;
     };
-  }, [sessionId]);
+  }, [sessionId, authLoading, isAuthenticated, router]);
 
   // Socket & Audio connection lifecycle
   const sessionStatusRef = useRef(session?.status);
@@ -317,6 +379,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
   }, [isAssistantSpeaking]);
 
   const handleSendText = useCallback((text: string) => {
+    setProcessingStage("thinking");
     interviewSocket.sendTextMessage(text);
     setTranscript((prev) => [
       ...prev,
@@ -336,6 +399,11 @@ export default function InterviewRoomPage({ params }: PageProps) {
     audioPlayer.onSpeakingChange = (speaking) => {
       setIsAssistantSpeaking(speaking);
       isAssistantSpeakingRef.current = speaking;
+      if (speaking) {
+        setProcessingStage("speaking");
+      } else {
+        setProcessingStage((prev) => (prev === "speaking" ? "idle" : prev));
+      }
     };
 
     // Instantiate audio recorder for live volume visualizer and streaming 16kHz PCM
@@ -479,12 +547,39 @@ export default function InterviewRoomPage({ params }: PageProps) {
     interviewSocket.interrupt();
     audioPlayer.stopAll();
     setIsAssistantSpeaking(false);
+    isAssistantSpeakingRef.current = false;
+    setProcessingStage("idle");
     setStreamingDelta(null);
   };
 
   const handleTogglePause = () => {
-    interviewSocket.pause();
-    setIsPaused(!isPaused);
+    if (!isPaused) {
+      wasMicActiveBeforePauseRef.current = isMicActive;
+      interviewSocket.pause();
+      recorderRef.current?.stop();
+      speechRecognizerRef.current?.stop();
+      audioPlayer.stopAll();
+      setIsMicActive(false);
+      setIsAssistantSpeaking(false);
+      isAssistantSpeakingRef.current = false;
+      setInterimCandidateSpeech(null);
+      setProcessingStage("idle");
+      setIsPaused(true);
+    } else {
+      interviewSocket.resume();
+      setIsPaused(false);
+      if (wasMicActiveBeforePauseRef.current && recorderRef.current) {
+        recorderRef.current
+          .start()
+          .then(() => {
+            speechRecognizerRef.current?.start();
+            setIsMicActive(true);
+          })
+          .catch(() => {
+            // Candidate can re-enable mic manually
+          });
+      }
+    }
   };
 
   const handleRequestHint = useCallback(() => {
@@ -578,7 +673,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
     }
   };
 
-  if (loading) {
+  if (authLoading || (!isAuthenticated && !error) || loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-zinc-400">
         <div className="h-8 w-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mb-4"></div>
@@ -653,7 +748,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
           <button
             type="button"
             onClick={() => setViewMode("voice")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               viewMode === "voice"
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-400 hover:text-zinc-200"
@@ -665,7 +760,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
           <button
             type="button"
             onClick={() => setViewMode("video")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               viewMode === "video"
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-400 hover:text-zinc-200"
@@ -677,7 +772,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
           <button
             type="button"
             onClick={() => setViewMode("coding")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               viewMode === "coding"
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-400 hover:text-zinc-200"
@@ -689,7 +784,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
           <button
             type="button"
             onClick={() => setViewMode("split")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               viewMode === "split"
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-400 hover:text-zinc-200"
@@ -706,7 +801,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
           <button
             type="button"
             onClick={handleToggleCamera}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors border cursor-pointer ${
               isCameraActive
                 ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/60"
                 : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
@@ -725,6 +820,18 @@ export default function InterviewRoomPage({ params }: PageProps) {
               }`}
             />
             <span>{isMicActive ? "Audio Live" : "Mic Muted"}</span>
+            {processingStage === "transcribing" && (
+              <span className="text-amber-300 text-[11px] font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                Transcribing...
+              </span>
+            )}
+            {processingStage === "thinking" && !isAssistantSpeaking && (
+              <span className="text-indigo-300 text-[11px] font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
+                AI Thinking...
+              </span>
+            )}
             {isAssistantSpeaking && (
               <span className="text-indigo-400 text-[11px] font-medium flex items-center gap-1">
                 <span className="animate-spin">🌀</span> AI Speaking
@@ -742,28 +849,34 @@ export default function InterviewRoomPage({ params }: PageProps) {
             <div className="lg:col-span-5 space-y-6 flex flex-col">
               <InterviewQuestionCard
                 question={session.currentQuestion ?? null}
+                allowHints={
+                  examinerMode && session.mode !== InterviewMode.ASSESSMENT
+                }
               />
 
-              <InterviewConceptTracker
-                coveredConcepts={
-                  orchestratorState?.coveredConcepts ??
-                  session.coveredConcepts ??
-                  []
-                }
-                remainingConcepts={
-                  orchestratorState?.remainingConcepts ??
-                  session.currentQuestion?.expectedConcepts ??
-                  []
-                }
-                activeProbingQuestion={
-                  orchestratorState?.activeProbingQuestion ?? null
-                }
-              />
+              {examinerMode && session.mode !== InterviewMode.ASSESSMENT && (
+                <InterviewConceptTracker
+                  coveredConcepts={
+                    orchestratorState?.coveredConcepts ??
+                    session.coveredConcepts ??
+                    []
+                  }
+                  remainingConcepts={
+                    orchestratorState?.remainingConcepts ??
+                    session.currentQuestion?.expectedConcepts ??
+                    []
+                  }
+                  activeProbingQuestion={
+                    orchestratorState?.activeProbingQuestion ?? null
+                  }
+                />
+              )}
 
               <InterviewAudioVisualizer
                 micVolume={micVolume}
                 isAssistantSpeaking={isAssistantSpeaking}
                 isMicActive={isMicActive}
+                processingStage={processingStage}
               />
 
               {session.status === InterviewStatus.COMPLETED && (
@@ -792,6 +905,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 streamingDelta={streamingDelta}
                 streamingRole={streamingRole}
                 interimCandidateSpeech={interimCandidateSpeech}
+                processingStage={processingStage}
               />
 
               <InterviewControls
@@ -827,6 +941,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
           <div className="space-y-6">
             <InterviewVideoContainer
               isAssistantSpeaking={isAssistantSpeaking}
+              isAiThinking={processingStage === "thinking"}
               stage={
                 orchestratorState?.stage ??
                 session.currentStage ??
@@ -835,7 +950,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
               personality={session.personality}
               companyCategory={session.companyCategory}
               targetRole={session.targetRole}
-              candidateName="Candidate"
+              candidateName={user?.name || "Candidate"}
               isCameraActive={isCameraActive}
               onToggleCamera={handleToggleCamera}
               layoutMode={videoLayoutMode}
@@ -846,26 +961,32 @@ export default function InterviewRoomPage({ params }: PageProps) {
               <div className="lg:col-span-5 space-y-6 flex flex-col">
                 <InterviewQuestionCard
                   question={session.currentQuestion ?? null}
-                />
-                <InterviewConceptTracker
-                  coveredConcepts={
-                    orchestratorState?.coveredConcepts ??
-                    session.coveredConcepts ??
-                    []
-                  }
-                  remainingConcepts={
-                    orchestratorState?.remainingConcepts ??
-                    session.currentQuestion?.expectedConcepts ??
-                    []
-                  }
-                  activeProbingQuestion={
-                    orchestratorState?.activeProbingQuestion ?? null
+                  allowHints={
+                    examinerMode && session.mode !== InterviewMode.ASSESSMENT
                   }
                 />
+                {examinerMode && session.mode !== InterviewMode.ASSESSMENT && (
+                  <InterviewConceptTracker
+                    coveredConcepts={
+                      orchestratorState?.coveredConcepts ??
+                      session.coveredConcepts ??
+                      []
+                    }
+                    remainingConcepts={
+                      orchestratorState?.remainingConcepts ??
+                      session.currentQuestion?.expectedConcepts ??
+                      []
+                    }
+                    activeProbingQuestion={
+                      orchestratorState?.activeProbingQuestion ?? null
+                    }
+                  />
+                )}
                 <InterviewAudioVisualizer
                   micVolume={micVolume}
                   isAssistantSpeaking={isAssistantSpeaking}
                   isMicActive={isMicActive}
+                  processingStage={processingStage}
                 />
               </div>
 
@@ -875,6 +996,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                   streamingDelta={streamingDelta}
                   streamingRole={streamingRole}
                   interimCandidateSpeech={interimCandidateSpeech}
+                  processingStage={processingStage}
                 />
                 <InterviewControls
                   isMicActive={isMicActive}
@@ -914,6 +1036,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                   micVolume={micVolume}
                   isAssistantSpeaking={isAssistantSpeaking}
                   isMicActive={isMicActive}
+                  processingStage={processingStage}
                 />
               </div>
 
@@ -941,12 +1064,52 @@ export default function InterviewRoomPage({ params }: PageProps) {
             <div className="min-h-[580px]">
               <InterviewCodeEditor
                 sessionId={session.id}
+                sessionQuestion={session.currentQuestion ?? null}
                 onCodeChange={handleCodeChange}
                 onCodeRun={handleCodeRun}
                 latestExecutionResult={codeExecutionResult}
                 isExecuting={isExecutingCode}
                 onRequestHint={handleRequestHint}
               />
+            </div>
+
+            {/* Persistent Live AI Prompt & Transcript Strip in Coding Mode */}
+            <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl overflow-hidden">
+              <div className="px-4 py-2.5 flex items-center justify-between gap-3 border-b border-zinc-800/80 bg-zinc-950/40">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400 shrink-0">
+                    Latest AI Prompt:
+                  </span>
+                  <span className="text-xs text-zinc-200 truncate">
+                    {streamingDelta ||
+                      [...transcript]
+                        .reverse()
+                        .find((t) => t.role === MessageRole.ASSISTANT)?.text ||
+                      "Waiting for interviewer introduction..."}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCodingTranscript((v) => !v)}
+                  className="text-xs font-medium text-indigo-300 hover:text-indigo-200 shrink-0 cursor-pointer"
+                >
+                  {showCodingTranscript
+                    ? "Hide Transcript"
+                    : "Show Transcript"}
+                </button>
+              </div>
+              {showCodingTranscript && (
+                <div className="p-3">
+                  <InterviewTranscript
+                    transcript={transcript}
+                    streamingDelta={streamingDelta}
+                    streamingRole={streamingRole}
+                    interimCandidateSpeech={interimCandidateSpeech}
+                    processingStage={processingStage}
+                    heightClassName="h-[220px]"
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -958,6 +1121,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
             <div className="lg:col-span-7 flex flex-col min-h-[580px]">
               <InterviewCodeEditor
                 sessionId={session.id}
+                sessionQuestion={session.currentQuestion ?? null}
                 onCodeChange={handleCodeChange}
                 onCodeRun={handleCodeRun}
                 latestExecutionResult={codeExecutionResult}
@@ -974,7 +1138,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                     isCameraActive={isCameraActive}
                     onToggleCamera={handleToggleCamera}
                     layoutMode={videoLayoutMode}
-                    candidateName="Candidate"
+                    candidateName={user?.name || "Candidate"}
                     isCompact={true}
                   />
                 </div>
@@ -984,6 +1148,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 micVolume={micVolume}
                 isAssistantSpeaking={isAssistantSpeaking}
                 isMicActive={isMicActive}
+                processingStage={processingStage}
               />
 
               <InterviewControls
@@ -1008,6 +1173,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
                 streamingDelta={streamingDelta}
                 streamingRole={streamingRole}
                 interimCandidateSpeech={interimCandidateSpeech}
+                processingStage={processingStage}
               />
 
               {examinerMode && (

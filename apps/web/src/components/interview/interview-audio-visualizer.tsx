@@ -6,12 +6,19 @@ interface InterviewAudioVisualizerProps {
   micVolume: number; // 0 - 100
   isAssistantSpeaking: boolean;
   isMicActive: boolean;
+  processingStage?:
+    | "idle"
+    | "listening"
+    | "transcribing"
+    | "thinking"
+    | "speaking";
 }
 
 export function InterviewAudioVisualizer({
   micVolume,
   isAssistantSpeaking,
   isMicActive,
+  processingStage = "idle",
 }: InterviewAudioVisualizerProps) {
   // Generate 16 bars for the waveform display
   const barCount = 16;
@@ -55,12 +62,22 @@ export function InterviewAudioVisualizer({
       </div>
 
       <div className="mt-3 flex items-center gap-2 text-xs">
-        {isAssistantSpeaking ? (
+        {isAssistantSpeaking || processingStage === "speaking" ? (
           <span className="flex items-center gap-1.5 text-indigo-400 font-medium">
             <span className="h-2 w-2 rounded-full bg-indigo-400 animate-ping"></span>
             AI Interviewer is speaking...
           </span>
-        ) : isMicActive && micVolume > 10 ? (
+        ) : processingStage === "transcribing" ? (
+          <span className="flex items-center gap-1.5 text-amber-300 font-medium">
+            <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
+            Transcribing your speech...
+          </span>
+        ) : processingStage === "thinking" ? (
+          <span className="flex items-center gap-1.5 text-indigo-300 font-medium">
+            <span className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse"></span>
+            AI Interviewer is thinking...
+          </span>
+        ) : (isMicActive && micVolume > 10) || processingStage === "listening" ? (
           <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
             Listening to your answer...

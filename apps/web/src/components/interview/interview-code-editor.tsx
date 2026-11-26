@@ -5,12 +5,49 @@ import dynamic from "next/dynamic";
 import {
   type CodingProblem,
   type CodeExecutionResult,
+  type QuestionResponse,
   type TestCaseResult,
   ProgrammingLanguage,
   CodeExecutionStatus,
   InterviewDifficulty,
 } from "@interviewai/shared-types";
 import { api } from "@/lib/api-client";
+
+function matchCodingProblemForQuestion(
+  problems: CodingProblem[],
+  question?: QuestionResponse | null,
+): CodingProblem | null {
+  if (!question || problems.length === 0) return null;
+  const qTitle = question.title.toLowerCase();
+  const qStem = question.stem.toLowerCase();
+
+  const exact = problems.find((p) => p.title.toLowerCase() === qTitle);
+  if (exact) return exact;
+
+  const partial = problems.find((p) => {
+    const pTitle = p.title.toLowerCase();
+    return qTitle.includes(pTitle) || pTitle.includes(qTitle);
+  });
+  if (partial) return partial;
+
+  const keywordPairs: Array<[RegExp, string]> = [
+    [/\blru\b|least recently used/, "lru-cache"],
+    [/lowest common ancestor|\blca\b/, "lowest-common-ancestor"],
+    [/\btwo sum\b/, "two-sum"],
+    [/parenthes|bracket/, "valid-parentheses"],
+    [/longest substring|without repeating/, "longest-substring-without-repeating"],
+    [/merge k|\bk sorted lists\b/, "merge-k-sorted-lists"],
+    [/course schedule|topological/, "course-schedule"],
+  ];
+
+  for (const [pattern, id] of keywordPairs) {
+    if (pattern.test(qTitle) || pattern.test(qStem)) {
+      const hit = problems.find((p) => p.id === id);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
 
 // Dynamically import Monaco Editor to avoid SSR hydration issues
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -27,6 +64,7 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 
 interface InterviewCodeEditorProps {
   sessionId?: string;
+  sessionQuestion?: QuestionResponse | null;
   onCodeChange?: (code: string, language: ProgrammingLanguage) => void;
   onCodeRun?: (
     code: string,
@@ -39,6 +77,7 @@ interface InterviewCodeEditorProps {
 }
 
 export function InterviewCodeEditor({
+  sessionQuestion,
   onCodeChange,
   onCodeRun,
   latestExecutionResult: externalExecutionResult,
@@ -62,11 +101,13 @@ export function InterviewCodeEditor({
   const [activeTabSub, setActiveTabSub] = useState<"all" | "details">("all");
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Preserve edits per (problemId:language) tab without wiping code on language switch
+  const codeByKeyRef = useRef<Record<string, string>>({});
 
   const isRunning = externalIsExecuting || isLocalExecuting;
   const executionResult = externalExecutionResult ?? localExecutionResult;
 
-  // Fetch coding problems on mount
+  // Fetch coding problems once on mount and select problem matching sessionQuestion
   useEffect(() => {
     let mounted = true;
     api.coding
@@ -74,9 +115,17 @@ export function InterviewCodeEditor({
       .then((data) => {
         if (mounted && data.length > 0) {
           setProblems(data);
-          const initialProb = data[0];
+          const matched = matchCodingProblemForQuestion(data, sessionQuestion);
+          const initialProb = matched || data[0];
+          const key = `${initialProb.id}:${language}`;
+          const initialCode =
+            codeByKeyRef.current[key] ??
+            initialProb.starterCode[language] ??
+            "";
+          codeByKeyRef.current[key] = initialCode;
           setSelectedProblemId(initialProb.id);
-          setCode(initialProb.starterCode[language] || "");
+          setCode(initialCode);
+          onCodeChange?.(initialCode, language);
         }
       })
       .catch((err) => {
@@ -85,36 +134,49 @@ export function InterviewCodeEditor({
     return () => {
       mounted = false;
     };
-  }, [language]);
+    // Fetch once on mount so switching language never resets selected problem or edited code
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentProblem =
     problems.find((p) => p.id === selectedProblemId) || problems[0];
 
   // Handle problem switch
   const handleProblemChange = (probId: string) => {
+    codeByKeyRef.current[`${selectedProblemId}:${language}`] = code;
     setSelectedProblemId(probId);
     const prob = problems.find((p) => p.id === probId);
     if (prob) {
-      const newCode = prob.starterCode[language] || "";
+      const key = `${prob.id}:${language}`;
+      const newCode =
+        codeByKeyRef.current[key] ?? prob.starterCode[language] ?? "";
+      codeByKeyRef.current[key] = newCode;
       setCode(newCode);
       onCodeChange?.(newCode, language);
     }
   };
 
-  // Handle language switch
+  // Handle language switch while keeping current problem and per-language code buffer
   const handleLanguageChange = (newLang: ProgrammingLanguage) => {
+    if (currentProblem) {
+      codeByKeyRef.current[`${currentProblem.id}:${language}`] = code;
+    }
     setLanguage(newLang);
     if (currentProblem) {
-      const newCode = currentProblem.starterCode[newLang] || "";
+      const key = `${currentProblem.id}:${newLang}`;
+      const newCode =
+        codeByKeyRef.current[key] ?? currentProblem.starterCode[newLang] ?? "";
+      codeByKeyRef.current[key] = newCode;
       setCode(newCode);
       onCodeChange?.(newCode, newLang);
     }
   };
 
-  // Reset starter code
+  // Reset starter code for active problem & language
   const handleResetCode = () => {
     if (!currentProblem) return;
     const starter = currentProblem.starterCode[language] || "";
+    codeByKeyRef.current[`${currentProblem.id}:${language}`] = starter;
     setCode(starter);
     onCodeChange?.(starter, language);
   };
@@ -123,6 +185,9 @@ export function InterviewCodeEditor({
   const handleEditorChange = (value?: string) => {
     const val = value ?? "";
     setCode(val);
+    if (currentProblem) {
+      codeByKeyRef.current[`${currentProblem.id}:${language}`] = val;
+    }
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -181,7 +246,7 @@ export function InterviewCodeEditor({
             <select
               value={selectedProblemId}
               onChange={(e) => handleProblemChange(e.target.value)}
-              className="bg-zinc-800 hover:bg-zinc-700/80 text-zinc-100 text-xs font-medium rounded-lg px-3 py-1.5 border border-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+              className="bg-zinc-800 hover:bg-zinc-700/80 text-zinc-100 text-xs font-medium rounded-lg px-3 py-1.5 border border-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer"
             >
               {problems.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -201,7 +266,7 @@ export function InterviewCodeEditor({
               onChange={(e) =>
                 handleLanguageChange(e.target.value as ProgrammingLanguage)
               }
-              className="bg-zinc-800 hover:bg-zinc-700/80 text-zinc-100 text-xs font-medium rounded-lg px-3 py-1.5 border border-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+              className="bg-zinc-800 hover:bg-zinc-700/80 text-zinc-100 text-xs font-medium rounded-lg px-3 py-1.5 border border-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors cursor-pointer"
             >
               <option value={ProgrammingLanguage.TYPESCRIPT}>TypeScript</option>
               <option value={ProgrammingLanguage.JAVASCRIPT}>JavaScript</option>
@@ -238,7 +303,7 @@ export function InterviewCodeEditor({
           <button
             type="button"
             onClick={handleResetCode}
-            className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800/60 hover:bg-zinc-800 rounded-lg border border-zinc-700/60 transition-colors"
+            className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800/60 hover:bg-zinc-800 rounded-lg border border-zinc-700/60 transition-colors cursor-pointer"
             title="Reset code to initial starter template"
           >
             Reset
@@ -249,7 +314,7 @@ export function InterviewCodeEditor({
             <button
               type="button"
               onClick={onRequestHint}
-              className="px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:text-white bg-indigo-500/20 hover:bg-indigo-500/30 rounded-lg border border-indigo-500/30 transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:text-white bg-indigo-500/20 hover:bg-indigo-500/30 rounded-lg border border-indigo-500/30 transition-colors cursor-pointer"
               title="Request a Socratic hint from the AI interviewer"
             >
               💡 Ask for Hint
@@ -261,7 +326,7 @@ export function InterviewCodeEditor({
             type="button"
             onClick={() => void handleRunCode()}
             disabled={isRunning}
-            className="flex items-center gap-2 px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800/40 disabled:text-zinc-400 rounded-lg shadow-sm transition-all transform active:scale-95"
+            className="flex items-center gap-2 px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800/40 disabled:text-zinc-400 rounded-lg shadow-sm transition-all transform active:scale-95 cursor-pointer"
             title="Execute test suite in isolated sandbox (Cmd+Enter)"
           >
             {isRunning ? (

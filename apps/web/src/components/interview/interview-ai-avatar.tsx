@@ -9,6 +9,7 @@ import {
 
 interface InterviewAiAvatarProps {
   isAssistantSpeaking: boolean;
+  isAiThinking?: boolean;
   stage?: InterviewStage;
   personality?: InterviewerPersonality;
   companyCategory?: CompanyCategory;
@@ -18,6 +19,7 @@ interface InterviewAiAvatarProps {
 
 export function InterviewAiAvatar({
   isAssistantSpeaking,
+  isAiThinking = false,
   stage = InterviewStage.PROBING,
   personality,
   companyCategory,
@@ -44,6 +46,7 @@ export function InterviewAiAvatar({
 
   const getStatusText = () => {
     if (isAssistantSpeaking) return "Speaking...";
+    if (isAiThinking) return "Thinking...";
     if (stage === InterviewStage.GREETING) return "Welcoming candidate";
     if (stage === InterviewStage.PROBLEM_FRAMING)
       return "Framing technical problem";
