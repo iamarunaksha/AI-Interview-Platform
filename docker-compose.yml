@@ -1,0 +1,108 @@
+# ============================================================
+# InterviewAI Platform — Docker Compose
+# ============================================================
+# Usage:
+#   docker compose up              — start all services
+#   docker compose up -d           — start in background
+#   docker compose down            — stop and remove containers
+#   docker compose logs -f api     — follow API logs
+# ============================================================
+
+services:
+  # ── PostgreSQL Database ────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: interviewai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: ${DATABASE_NAME:-interviewai_dev}
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis (Sessions / Queues) ──────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: interviewai-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── NestJS API Backend ─────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: interviewai-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4000
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: ${DATABASE_USER:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      DATABASE_NAME: ${DATABASE_NAME:-interviewai_dev}
+      DATABASE_SSL: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-access-secret-replace-in-production-min-32-chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-jwt-refresh-secret-replace-in-production-min-32-chars}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      REALTIME_PROVIDER: ${REALTIME_PROVIDER:-gemini}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      STT_PROVIDER: ${STT_PROVIDER:-deepgram}
+      TTS_PROVIDER: ${TTS_PROVIDER:-deepgram}
+      EVALUATION_PROVIDER: ${EVALUATION_PROVIDER:-gemini}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Next.js Frontend ───────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:4000}
+    container_name: interviewai-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  uploads:
+    driver: local

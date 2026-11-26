@@ -59,12 +59,28 @@ export class AuthService implements OnModuleInit {
     );
 
     if (nodeEnv === 'production') {
-      if (
-        jwtSecret === 'dev-secret-change-me' ||
-        refreshSecret === 'refresh-dev-secret'
-      ) {
+      const insecureSecrets = new Set([
+        'dev-secret-change-me',
+        'refresh-dev-secret',
+        'dev-jwt-access-secret-replace-in-production-min-32-chars',
+        'dev-jwt-refresh-secret-replace-in-production-min-32-chars',
+      ]);
+
+      const isWeakSecret = (val: string) =>
+        !val ||
+        val.length < 32 ||
+        insecureSecrets.has(val) ||
+        val.includes('replace-in-production');
+
+      if (isWeakSecret(jwtSecret) || isWeakSecret(refreshSecret)) {
         throw new Error(
-          'FATAL SECURITY VIOLATION: Default JWT secrets detected in production environment! Set JWT_SECRET and JWT_REFRESH_SECRET to cryptographically secure strings.',
+          'FATAL SECURITY VIOLATION: Weak or default JWT secrets detected in production environment! Set JWT_SECRET and JWT_REFRESH_SECRET to unique cryptographically secure strings (>= 32 chars).',
+        );
+      }
+
+      if (jwtSecret === refreshSecret) {
+        throw new Error(
+          'FATAL SECURITY VIOLATION: JWT_SECRET and JWT_REFRESH_SECRET must be distinct in production.',
         );
       }
     }
@@ -210,7 +226,8 @@ export class AuthService implements OnModuleInit {
           'JWT_SECRET',
           'dev-secret-change-me',
         ),
-        expiresIn: '15m',
+        expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ||
+          '15m') as never,
       },
     );
   }
@@ -223,7 +240,8 @@ export class AuthService implements OnModuleInit {
           'JWT_REFRESH_SECRET',
           'refresh-dev-secret',
         ),
-        expiresIn: '7d',
+        expiresIn: (this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ||
+          '7d') as never,
       },
     );
   }

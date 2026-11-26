@@ -172,4 +172,32 @@ describe('InterviewGateway', () => {
       'session-123',
     );
   });
+
+  it('should block cross-session WebSocket events (BOLA prevention)', async () => {
+    // Socket joins session-123
+    await gateway.handleJoinSession(mockSocket as Socket, {
+      sessionId: 'session-123',
+    });
+
+    // Attacker tries to end or send messages to another session
+    await gateway.handleEndInterview(mockSocket as Socket, {
+      sessionId: 'victim-session-999',
+    });
+    await gateway.handleTextMessage(mockSocket as Socket, {
+      sessionId: 'victim-session-999',
+      text: 'Injected text',
+    });
+
+    expect(mockInterviewService.endSession).not.toHaveBeenCalled();
+    expect(mockInterviewService.sendClientText).not.toHaveBeenCalled();
+  });
+
+  it('should reject WebSocket events from sockets that have not joined a session', async () => {
+    await gateway.handleTextMessage(mockSocket as Socket, {
+      sessionId: 'session-123',
+      text: 'Unjoined text',
+    });
+
+    expect(mockInterviewService.sendClientText).not.toHaveBeenCalled();
+  });
 });

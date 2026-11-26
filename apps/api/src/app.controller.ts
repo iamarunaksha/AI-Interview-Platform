@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { AppService } from './app.service.js';
 import type { SystemHealthResponse } from '@interviewai/shared-types';
 
@@ -7,8 +8,29 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get('health')
-  async getHealth(): Promise<SystemHealthResponse> {
-    return this.appService.getHealth();
+  async getHealth(
+    @Res({ passthrough: true }) res?: Response,
+  ): Promise<SystemHealthResponse> {
+    const health = await this.appService.getHealth();
+    if (res && health.status !== 'ok') {
+      res.status(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    return health;
+  }
+
+  @Get('health/live')
+  getLiveness(): { status: 'ok'; timestamp: string } {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('health/ready')
+  async getReadiness(
+    @Res({ passthrough: true }) res?: Response,
+  ): Promise<SystemHealthResponse> {
+    return this.getHealth(res);
   }
 
   @Get()

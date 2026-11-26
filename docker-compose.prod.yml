@@ -1,0 +1,37 @@
+# ============================================================
+# InterviewAI Platform — Production Compose Override
+# ============================================================
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================
+
+services:
+  api:
+    restart: always
+    environment:
+      NODE_ENV: production
+      DB_SYNCHRONIZE: "false"
+      DB_MIGRATIONS_RUN: "true"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  web:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  postgres:
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required in production}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G

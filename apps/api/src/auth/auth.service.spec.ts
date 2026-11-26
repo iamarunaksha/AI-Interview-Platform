@@ -150,13 +150,31 @@ describe('AuthService', () => {
       );
     });
 
+    it('should throw an error in production if .env.example placeholder secrets are detected', () => {
+      vi.spyOn(mockConfigService, 'get').mockImplementation(
+        (key: string, defaultValue?: any) => {
+          if (key === 'NODE_ENV') return 'production';
+          if (key === 'JWT_SECRET')
+            return 'dev-jwt-access-secret-replace-in-production-min-32-chars';
+          if (key === 'JWT_REFRESH_SECRET')
+            return 'another-secure-random-secret-with-32-plus-chars';
+          return defaultValue;
+        },
+      );
+
+      expect(() => authService.onModuleInit()).toThrow(
+        /FATAL SECURITY VIOLATION/,
+      );
+    });
+
     it('should pass cleanly when secure secrets are configured in production', () => {
       vi.spyOn(mockConfigService, 'get').mockImplementation(
         (key: string, defaultValue?: any) => {
           if (key === 'NODE_ENV') return 'production';
-          if (key === 'JWT_SECRET') return 'super-cryptographic-random-secret';
+          if (key === 'JWT_SECRET')
+            return 'super-cryptographic-random-secret-32-chars';
           if (key === 'JWT_REFRESH_SECRET')
-            return 'another-secure-random-secret';
+            return 'another-secure-random-secret-32-plus-chars';
           return defaultValue;
         },
       );

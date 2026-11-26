@@ -1,0 +1,53 @@
+# Dependencies
+node_modules
+.pnpm-store
+.tools
+
+# Build outputs (rebuilt in container)
+dist
+.next
+.turbo
+out
+
+# Source control
+.git
+.gitignore
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Testing & Coverage
+coverage
+**/*.spec.ts
+**/*.test.ts
+**/test
+**/__tests__
+
+# Dev tools
+.tools
+scripts/env.sh
+
+# Documentation (not needed in image)
+LICENSE
+
+# Uploads (dev only)
+uploads
+
+# Local AI config
+.gemini

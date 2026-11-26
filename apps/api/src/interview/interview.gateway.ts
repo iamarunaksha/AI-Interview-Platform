@@ -212,6 +212,32 @@ export class InterviewGateway
     }
   }
 
+  private readonly MAX_AUDIO_CHUNK_BYTES = 1024 * 1024; // 1 MiB ceiling per WebSocket frame
+
+  /**
+   * Enforce that a socket only operates on the interview session it has been
+   * authenticated & authorized to join. Prevents cross-session BOLA over WebSockets.
+   */
+  private getAuthorizedSessionId(
+    client: Socket,
+    requestedSessionId?: string,
+  ): string | null {
+    const joinedSessionId = this.socketSessionMap.get(client.id);
+    if (!joinedSessionId) {
+      this.logger.warn(
+        `Rejected WebSocket event from unjoined socket ${client.id}`,
+      );
+      return null;
+    }
+    if (requestedSessionId && requestedSessionId !== joinedSessionId) {
+      this.logger.warn(
+        `Blocked cross-session event from socket ${client.id} (joined=${joinedSessionId}, target=${requestedSessionId})`,
+      );
+      return null;
+    }
+    return joinedSessionId;
+  }
+
   /**
    * Handle incoming streaming audio chunks from candidate microphone.
    */
@@ -221,13 +247,13 @@ export class InterviewGateway
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     @MessageBody() payload: any,
   ) {
-    let sessionId = this.socketSessionMap.get(client.id);
+    let requestedSessionId: string | undefined;
     let chunkData: Buffer | Uint8Array;
 
     if (Buffer.isBuffer(payload) || payload instanceof Uint8Array) {
       chunkData = payload;
     } else if (payload && payload.chunk) {
-      sessionId = payload.sessionId || sessionId;
+      requestedSessionId = payload.sessionId;
       if (typeof payload.chunk === 'string') {
         chunkData = Buffer.from(payload.chunk, 'base64');
       } else {
@@ -237,6 +263,14 @@ export class InterviewGateway
       return;
     }
 
+    if (chunkData.byteLength > this.MAX_AUDIO_CHUNK_BYTES) {
+      this.logger.warn(
+        `Dropped oversized audio chunk (${chunkData.byteLength} bytes) from socket ${client.id}`,
+      );
+      return;
+    }
+
+    const sessionId = this.getAuthorizedSessionId(client, requestedSessionId);
     if (!sessionId) return;
 
     await this.interviewService.sendClientAudio(sessionId, chunkData);
@@ -250,8 +284,8 @@ export class InterviewGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { sessionId?: string; text: string },
   ) {
-    const sessionId = data.sessionId || this.socketSessionMap.get(client.id);
-    if (!sessionId || !data.text) return;
+    const sessionId = this.getAuthorizedSessionId(client, data?.sessionId);
+    if (!sessionId || !data?.text) return;
 
     this.logger.debug(
       `Received text message in session ${sessionId}: "${data.text}"`,
@@ -267,7 +301,7 @@ export class InterviewGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data?: { sessionId?: string },
   ) {
-    const sessionId = data?.sessionId || this.socketSessionMap.get(client.id);
+    const sessionId = this.getAuthorizedSessionId(client, data?.sessionId);
     if (!sessionId) return;
 
     await this.interviewService.interruptAssistant(sessionId);
@@ -285,7 +319,7 @@ export class InterviewGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data?: { sessionId?: string },
   ) {
-    const sessionId = data?.sessionId || this.socketSessionMap.get(client.id);
+    const sessionId = this.getAuthorizedSessionId(client, data?.sessionId);
     if (!sessionId) return;
 
     const updated = await this.interviewService.pauseSession(sessionId);
@@ -304,7 +338,7 @@ export class InterviewGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data?: { sessionId?: string; reason?: string },
   ) {
-    const sessionId = data?.sessionId || this.socketSessionMap.get(client.id);
+    const sessionId = this.getAuthorizedSessionId(client, data?.sessionId);
     if (!sessionId) return;
 
     const updated = await this.interviewService.endSession(sessionId);
@@ -330,8 +364,8 @@ export class InterviewGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { sessionId?: string; code: string; language: string },
   ) {
-    const sessionId = data.sessionId || this.socketSessionMap.get(client.id);
-    if (!sessionId || data.code === undefined) return;
+    const sessionId = this.getAuthorizedSessionId(client, data?.sessionId);
+    if (!sessionId || data?.code === undefined) return;
 
     this.interviewService.updateSessionCode(
       sessionId,
@@ -354,8 +388,8 @@ export class InterviewGateway
       problemId?: string;
     },
   ) {
-    const sessionId = data.sessionId || this.socketSessionMap.get(client.id);
-    if (!sessionId || !data.code) return;
+    const sessionId = this.getAuthorizedSessionId(client, data?.sessionId);
+    if (!sessionId || !data?.code) return;
 
     client.emit('code.status', {
       status: 'running',
@@ -394,7 +428,7 @@ export class InterviewGateway
       layoutMode?: VideoLayoutMode;
     },
   ) {
-    const sessionId = data?.sessionId || this.socketSessionMap.get(client.id);
+    const sessionId = this.getAuthorizedSessionId(client, data?.sessionId);
     if (!sessionId) return;
 
     this.interviewService.updateSessionVideoState(

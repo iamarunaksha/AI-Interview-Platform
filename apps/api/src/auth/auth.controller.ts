@@ -11,6 +11,7 @@ import {
 import { AuthService } from './auth.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { RefreshTokenDto } from './dto/refresh-token.dto.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { LocalAuthGuard } from './guards/local-auth.guard.js';
 import { RateLimit } from '../common/decorators/rate-limit.decorator.js';
@@ -71,11 +72,12 @@ export class AuthController {
    * Exchange a refresh token for a new access token.
    */
   @Post('refresh')
+  @RateLimit({ ttlSeconds: 60, limit: 20 })
   @HttpCode(HttpStatus.OK)
   async refresh(
-    @Body('refreshToken') refreshToken: string,
+    @Body() dto: RefreshTokenDto,
   ): Promise<{ accessToken: string }> {
-    return this.authService.refreshAccessToken(refreshToken);
+    return this.authService.refreshAccessToken(dto.refreshToken);
   }
 
   /**

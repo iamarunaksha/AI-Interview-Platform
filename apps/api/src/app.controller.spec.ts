@@ -43,5 +43,23 @@ describe('AppController', () => {
       expect(health.domains).toContain('sde');
       expect(health.domains).toContain('sap');
     });
+
+    it('should always return 200 ok for liveness probe', () => {
+      const live = appController.getLiveness();
+      expect(live.status).toBe('ok');
+      expect(live.timestamp).toBeTruthy();
+    });
+
+    it('should set 503 status on readiness probe when database is disconnected', async () => {
+      mockDataSource.query = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Connection refused'));
+      const mockRes = { status: vi.fn() } as any;
+
+      const health = await appController.getReadiness(mockRes);
+      expect(health.status).toBe('degraded');
+      expect(health.database.status).toBe('disconnected');
+      expect(mockRes.status).toHaveBeenCalledWith(503);
+    });
   });
 });

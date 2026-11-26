@@ -9,12 +9,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CodingService } from './coding.service.js';
+import { CodeRunDto } from './dto/code-run.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RateLimit } from '../common/decorators/rate-limit.decorator.js';
 import type {
   CodingProblem,
   CodeExecutionResult,
-  CodeRunRequest,
 } from '@interviewai/shared-types';
 
 @ApiTags('coding')
@@ -45,7 +45,7 @@ export class CodingController {
       'Execute candidate code in the isolated sandbox against test suites',
   })
   async runCode(
-    @Body() request: CodeRunRequest,
+    @Body() request: CodeRunDto,
     @Query('problemId') problemId?: string,
   ): Promise<CodeExecutionResult> {
     return this.codingService.runCode(request, problemId);

@@ -6,7 +6,10 @@ import type {
   VideoLayoutMode,
 } from "@interviewai/shared-types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const WS_BASE_URL =
+  process.env.NEXT_PUBLIC_WS_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:4000";
 
 export class InterviewSocketClient {
   private socket: Socket | null = null;
@@ -35,7 +38,7 @@ export class InterviewSocketClient {
 
     const token = getStoredAccessToken();
 
-    this.socket = io(`${API_BASE_URL}/interview`, {
+    this.socket = io(`${WS_BASE_URL}/interview`, {
       transports: ["websocket", "polling"],
       auth: {
         token: token ?? undefined,
