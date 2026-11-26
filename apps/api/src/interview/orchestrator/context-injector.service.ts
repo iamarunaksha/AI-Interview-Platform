@@ -18,7 +18,11 @@ export interface ContextInjectionParams {
   remainingConcepts: string[];
   activeProbing?: ProbingQuestion | null;
   remainingMinutes?: number;
-  activeCode?: { code: string; language: string } | null;
+  activeCode?: {
+    code: string;
+    language: string;
+    lastRunSummary?: string;
+  } | null;
 }
 
 export interface GuardrailCheckResult {
@@ -125,11 +129,12 @@ export class ContextInjectorService {
           (session.experienceLevel === ExperienceLevel.FRESHER ||
             session.experienceLevel === ExperienceLevel.SDE_1)));
 
+    const sessionMinutes = session.durationMinutes || 30;
     const roleProfile = isSap
       ? `You are a Senior SAP Enterprise Solutions Architect & Practice Director conducting an authentic, collaborative technical interview for a ${session.experienceLevel} candidate targeting the enterprise role of "${session.targetRole}". You speak like an experienced enterprise advisor: warm, professional, grounded in real-world business transformation scenarios, and interested in enterprise stability, scalability, and Clean Core trade-offs.`
       : isDsa
-        ? `You are a Senior Software Engineer at a top-tier FAANG company (Google/Meta/Amazon) conducting a live 45-minute Data Structures & Algorithms (DSA) technical coding interview for a ${session.experienceLevel} candidate targeting the role of "${session.targetRole}". You speak like a real senior engineer: collaborative, encouraging clear problem breakdown, attentive to Big-O time and space complexity, welcoming clarifying questions about constraints, and guiding the candidate through the code editor rather than acting like a robotic quiz proctor.`
-        : `You are a Principal Engineering Interviewer conducting a live adaptive systems architecture interview for a ${session.experienceLevel} candidate targeting the role of "${session.targetRole}".`;
+        ? `You are a Senior Software Engineer at a top-tier FAANG company (Google/Meta/Amazon) conducting a live ${sessionMinutes}-minute Data Structures & Algorithms (DSA) technical coding interview for a ${session.experienceLevel} candidate targeting the role of "${session.targetRole}". You speak like a real senior engineer: collaborative, encouraging clear problem breakdown, attentive to Big-O time and space complexity, welcoming clarifying questions about constraints, and guiding the candidate through the code editor rather than acting like a robotic quiz proctor.`
+        : `You are a Principal Engineering Interviewer conducting a live ${sessionMinutes}-minute adaptive systems architecture interview for a ${session.experienceLevel} candidate targeting the role of "${session.targetRole}".`;
 
     const sapDirective = isSap
       ? `SAP Enterprise Architecture & Clean Core Advisory Directives:
@@ -161,6 +166,7 @@ export class ContextInjectorService {
       activeProbing,
       isSap,
       isDsa,
+      sessionMinutes,
     );
 
     const resumeDirective =
@@ -174,14 +180,20 @@ Resume-Driven Customization Directives:
 2. Probe into the architectural choices, scalability challenges, and failure modes of the systems they claim to have built.`
         : '';
 
-    const codeContext =
-      activeCode && activeCode.code.trim().length > 0
-        ? `Candidate Live Code Buffer (${activeCode.language}):
+    const codeContextParts: string[] = [];
+    if (activeCode && activeCode.code.trim().length > 0) {
+      codeContextParts.push(`Candidate Live Code Buffer (${activeCode.language}):
 \`\`\`${activeCode.language}
 ${activeCode.code.slice(0, 1500)}
 \`\`\`
-Note: The candidate is actively editing this code in their coding environment. Reference their variables, algorithmic structure, edge cases, and time/space complexity where appropriate.`
-        : '';
+Note: The candidate is actively editing this code in their coding environment. Reference their variables, algorithmic structure, edge cases, and time/space complexity where appropriate.`);
+    }
+    if (activeCode?.lastRunSummary) {
+      codeContextParts.push(
+        `Latest Sandbox Execution Result: ${activeCode.lastRunSummary}`,
+      );
+    }
+    const codeContext = codeContextParts.join('\n\n');
 
     const timingConstraint =
       remainingMinutes !== undefined
@@ -248,6 +260,7 @@ Note: The candidate is actively editing this code in their coding environment. R
     activeProbing?: ProbingQuestion | null,
     isSap = false,
     isDsa = false,
+    sessionMinutes = 30,
   ): string {
     switch (stage) {
       case InterviewStage.GREETING:
@@ -259,7 +272,7 @@ Your immediate task:
           isSap
             ? '"Today we will be walking through an enterprise architecture and modernization scenario, focusing on S/4HANA core processes, Clean Core extensibility, and cloud integration."'
             : isDsa
-              ? '"Today we will be working through a 45-minute Data Structures & Algorithms coding challenge. We\'ll collaborate in the code editor, and I want to see how you break down problems, analyze trade-offs, and implement clean code."'
+              ? `"Today we will be working through a ${sessionMinutes}-minute Data Structures & Algorithms coding challenge. We'll collaborate in the code editor, and I want to see how you break down problems, analyze trade-offs, and implement clean code."`
               : '"Today we will be diving into system design and architecture concepts."'
         }).
 - Ask them how they are doing and if they are ready to begin.

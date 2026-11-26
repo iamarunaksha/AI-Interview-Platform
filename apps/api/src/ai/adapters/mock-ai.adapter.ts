@@ -871,6 +871,14 @@ class MockRealtimeSession implements IRealtimeSession {
     return `Good point. How would you verify the time and space complexity of this solution under high-throughput production workloads?`;
   }
 
+  updateSystemInstruction(instruction: string): void {
+    this.config.systemInstruction = instruction;
+  }
+
+  async sendSystemEvent(eventDescription: string): Promise<void> {
+    await this.sendText(eventDescription);
+  }
+
   async interrupt(): Promise<void> {
     this.isAssistantSpeaking = false;
     this.emit({ type: 'assistant.interrupted', timestamp: Date.now() });

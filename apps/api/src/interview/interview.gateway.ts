@@ -95,9 +95,10 @@ export class InterviewGateway
   @SubscribeMessage('session.join')
   async handleJoinSession(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { sessionId: string; token?: string },
+    @MessageBody()
+    data: { sessionId: string; token?: string; language?: string },
   ) {
-    const { sessionId, token } = data;
+    const { sessionId, token, language } = data;
     if (!sessionId) {
       client.emit('session.error', {
         type: 'session.error',
@@ -175,6 +176,9 @@ export class InterviewGateway
 
       await client.join(sessionId);
       this.socketSessionMap.set(client.id, sessionId);
+      if (language) {
+        this.interviewService.setSessionLanguage(sessionId, language);
+      }
       this.logger.log(
         `Client ${client.id} joined room for session ${sessionId} (User: ${user?.email ?? 'anonymous'})`,
       );
@@ -445,5 +449,19 @@ export class InterviewGateway
     };
     client.emit('video.state', event);
     client.emit('conversation.event', event);
+  }
+
+  /**
+   * Handle runtime speech accent calibration updates from the candidate UI.
+   */
+  @SubscribeMessage('audio.config')
+  handleAudioConfig(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId?: string; language: string },
+  ) {
+    const sessionId = this.getAuthorizedSessionId(client, data?.sessionId);
+    if (!sessionId || !data?.language) return;
+
+    this.interviewService.setSessionLanguage(sessionId, data.language);
   }
 }

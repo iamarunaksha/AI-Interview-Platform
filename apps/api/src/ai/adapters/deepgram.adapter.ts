@@ -40,12 +40,61 @@ export class DeepgramAdapter {
   }
 
   /**
+   * Strip Markdown formatting so Deepgram Aura TTS speaks natural conversational text
+   * without pronouncing asterisks, backticks, headers, or code fences.
+   */
+  static stripMarkdownForSpeech(text: string): string {
+    return text
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      .replace(/#+\s*/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/^[-*•]\s+/gm, '')
+      .replace(/\n+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  private static readonly SUPPORTED_STT_LANGUAGES = new Set([
+    'en-IN',
+    'en-US',
+    'en-GB',
+    'en',
+  ]);
+
+  private static readonly TECHNICAL_KEYWORDS = [
+    'LRU:2',
+    'HashMap:2',
+    'BFS:2',
+    'DFS:2',
+    'Kahn:2',
+    'Dijkstra:2',
+    'deque:2',
+    'in-degree:2',
+    'trie:1.5',
+    'heap:1.5',
+    'sentinel:1.5',
+    'doubly:1.5',
+    'monotonic:1.5',
+    'ACDOCA:2',
+    'ABAP:2',
+    'BDEF:2',
+    'BTP:2',
+  ];
+
+  /**
    * Transcribe a pre-recorded audio buffer to text.
-   * Supports raw 16kHz linear16 PCM and standard audio containers (WAV, WebM).
+   * Supports raw 16kHz linear16 PCM and standard audio containers (WAV, WebM),
+   * calibrated by candidate accent locale and technical keyword boosting.
    */
   async transcribeAudio(
     audioBuffer: Buffer,
     mimetype = 'audio/raw',
+    options?: { language?: string },
   ): Promise<string> {
     if (!this.isConfigured || audioBuffer.length === 0) {
       return '';
@@ -57,9 +106,28 @@ export class DeepgramAdapter {
         mimetype === 'audio/pcm' ||
         mimetype === 'audio/l16';
 
-      const url = isRawPcm
-        ? 'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&encoding=linear16&sample_rate=16000&channels=1'
-        : 'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true';
+      const requestedLang = options?.language?.trim() || 'en-IN';
+      const language = DeepgramAdapter.SUPPORTED_STT_LANGUAGES.has(requestedLang)
+        ? requestedLang
+        : 'en-IN';
+
+      const params = new URLSearchParams({
+        model: 'nova-2',
+        smart_format: 'true',
+        language,
+      });
+
+      if (isRawPcm) {
+        params.set('encoding', 'linear16');
+        params.set('sample_rate', '16000');
+        params.set('channels', '1');
+      }
+
+      for (const kw of DeepgramAdapter.TECHNICAL_KEYWORDS) {
+        params.append('keywords', kw);
+      }
+
+      const url = `https://api.deepgram.com/v1/listen?${params.toString()}`;
 
       const response = await fetch(url, {
         method: 'POST',
@@ -86,12 +154,14 @@ export class DeepgramAdapter {
 
   /**
    * Synthesize text into linear PCM / WAV audio buffer.
+   * Automatically strips Markdown syntax before synthesis.
    */
   async synthesizeSpeech(
     text: string,
     model = 'aura-asteria-en',
   ): Promise<Buffer> {
-    if (!this.isConfigured || !text.trim()) {
+    const cleanSpeechText = DeepgramAdapter.stripMarkdownForSpeech(text);
+    if (!this.isConfigured || !cleanSpeechText) {
       return Buffer.from([]);
     }
 
@@ -104,7 +174,7 @@ export class DeepgramAdapter {
             Authorization: `Token ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text: cleanSpeechText }),
         },
       );
 

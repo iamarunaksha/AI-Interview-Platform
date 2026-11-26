@@ -132,6 +132,14 @@ export class InterviewSocketClient {
     });
   }
 
+  setAudioLanguage(language: string): void {
+    if (!this.socket || !this.isConnected || !this.sessionId) return;
+    this.socket.emit("audio.config", {
+      sessionId: this.sessionId,
+      language,
+    });
+  }
+
   interrupt(): void {
     if (!this.socket || !this.isConnected || !this.sessionId) return;
     this.socket.emit("interview.interrupt", {

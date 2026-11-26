@@ -94,6 +94,8 @@ describe('InterviewService', () => {
     mockRealtimeSession = {
       sessionId: 'session-123',
       sendAudio: vi.fn().mockResolvedValue(undefined),
+      updateSystemInstruction: vi.fn(),
+      sendSystemEvent: vi.fn().mockResolvedValue(undefined),
       sendText: vi.fn().mockImplementation((text: string) => {
         if (capturedHandler) {
           capturedHandler({
@@ -227,6 +229,9 @@ describe('InterviewService', () => {
     expect(bridge).toBeDefined();
     await service.sendClientText('session-123', 'I like Redis token bucket.');
 
+    expect(mockRealtimeSession.updateSystemInstruction).toHaveBeenCalledWith(
+      expect.stringContaining('PROBLEM FRAMING'),
+    );
     expect(mockRealtimeSession.sendText).toHaveBeenCalledWith(
       'I like Redis token bucket.',
     );

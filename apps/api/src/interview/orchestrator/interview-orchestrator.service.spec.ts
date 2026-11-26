@@ -354,5 +354,50 @@ describe('Interview Orchestrator Engine', () => {
         expect(check.response).toBeUndefined();
       }
     });
+
+    it('should detect spoken DSA rubric concepts transcribed by STT (e.g. "o of one")', async () => {
+      const lruQuestion = Object.assign(new Question(), {
+        id: 'q-lru',
+        title: 'Concurrent LRU Cache Architecture',
+        stem: 'Implement LRU cache with O(1) get and put.',
+        expectedConcepts: [
+          'Hash Map for O(1) key-to-node lookup',
+          'Doubly Linked List for O(1) eviction and move-to-head operations',
+          'Sentinel dummy head and tail pointers to eliminate edge-case null checks',
+        ],
+        commonMisconceptions: [],
+        probingQuestions: [],
+      });
+
+      const dsaSession = Object.assign(new InterviewSessionEntity(), {
+        id: 'sess-dsa-stt',
+        targetRole: 'SDE II',
+        experienceLevel: ExperienceLevel.SDE_2,
+        difficulty: InterviewDifficulty.MEDIUM,
+        personality: InterviewerPersonality.PROFESSIONAL,
+        mode: InterviewMode.PRACTICE,
+        durationMinutes: 45,
+        currentStage: InterviewStage.PROBLEM_FRAMING,
+        coveredConcepts: [],
+        currentQuestion: lruQuestion,
+        startedAt: new Date(),
+      });
+
+      const res = await orchestrator.processCandidateTurn(
+        dsaSession,
+        'I will use a hash map for o of one lookup combined with a doubly linked list and dummy head and tail sentinel nodes for eviction.',
+      );
+
+      expect(res.state.coveredConcepts).toContain(
+        'Hash Map for O(1) key-to-node lookup',
+      );
+      expect(res.state.coveredConcepts).toContain(
+        'Doubly Linked List for O(1) eviction and move-to-head operations',
+      );
+      expect(res.state.coveredConcepts).toContain(
+        'Sentinel dummy head and tail pointers to eliminate edge-case null checks',
+      );
+      expect(res.state.remainingConcepts).toEqual([]);
+    });
   });
 });

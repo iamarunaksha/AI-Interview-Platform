@@ -367,6 +367,7 @@ export default function InterviewRoomPage({ params }: PageProps) {
     // Connect to WebSocket gateway
     interviewSocket.connect(sessionId, {
       onReady: () => {
+        interviewSocket.setAudioLanguage(accentLocale);
         // Attempt mic auto-start if in progress
         const currentStatus = sessionStatusRef.current;
         if (
@@ -440,9 +441,10 @@ export default function InterviewRoomPage({ params }: PageProps) {
     };
   }, []);
 
-  // Synchronize runtime accent calibration with active speech recognizer
+  // Synchronize runtime accent calibration with active speech recognizer and backend Deepgram STT
   useEffect(() => {
     speechRecognizerRef.current?.setLanguage(accentLocale);
+    interviewSocket.setAudioLanguage(accentLocale);
   }, [accentLocale]);
 
   const handleToggleMic = async () => {

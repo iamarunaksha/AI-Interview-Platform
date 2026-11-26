@@ -127,13 +127,50 @@ export class InterviewOrchestratorService {
   }
 
   /**
+   * Rebuild the current system instruction without advancing turn counters
+   * (e.g., when editor code changes or tests execute).
+   */
+  buildCurrentInstruction(
+    session: InterviewSessionEntity,
+    activeCode?: {
+      code: string;
+      language: string;
+      lastRunSummary?: string;
+    } | null,
+  ): string {
+    const state = this.initSession(session);
+    const totalDuration = (session.durationMinutes || 30) * 60;
+    const totalElapsed = session.startedAt
+      ? Math.round(
+          (Date.now() - new Date(session.startedAt).getTime()) / 1000,
+        )
+      : state.elapsedSeconds;
+    const remainingMinutes = Math.max(0, (totalDuration - totalElapsed) / 60);
+
+    return this.contextInjector.buildSystemInstruction({
+      session,
+      stage: state.stage,
+      question: session.currentQuestion,
+      coveredConcepts: state.coveredConcepts,
+      remainingConcepts: state.remainingConcepts,
+      activeProbing: state.activeProbingQuestion,
+      remainingMinutes,
+      activeCode,
+    });
+  }
+
+  /**
    * Process a candidate's turn: detect concept coverage, select probing branch,
    * evaluate stage advance, and inject new context instructions.
    */
   async processCandidateTurn(
     session: InterviewSessionEntity,
     candidateTranscript: string,
-    activeCode?: { code: string; language: string } | null,
+    activeCode?: {
+      code: string;
+      language: string;
+      lastRunSummary?: string;
+    } | null,
   ): Promise<TurnOrchestrationResult> {
     const state = this.initSession(session);
     state.turnCount += 1;
@@ -214,29 +251,104 @@ export class InterviewOrchestratorService {
     };
   }
 
+  private static readonly CONCEPT_STOP_WORDS = new Set([
+    'for',
+    'and',
+    'the',
+    'with',
+    'when',
+    'that',
+    'from',
+    'into',
+    'using',
+    'via',
+    'both',
+    'each',
+    'all',
+    'are',
+    'was',
+    'where',
+    'without',
+    'eliminate',
+    'operations',
+    'operation',
+    'control',
+    'handling',
+    'avoiding',
+    'checks',
+    'check',
+    'pointers',
+    'nodes',
+    'such',
+    'than',
+    'over',
+    'under',
+    'time',
+    'space',
+    'complexity',
+  ]);
+
+  private normalizeTechnicalText(raw: string): string {
+    return raw
+      .toLowerCase()
+      .replace(/\bof\s+one\b|\bo\s+of\s+1\b|\border\s+of\s+(one|1)\b/g, 'o(1)')
+      .replace(/\bo\s+of\s+n\b|\border\s+of\s+n\b/g, 'o(n)')
+      .replace(/\bo\s+of\s+log\s+n\b|\border\s+of\s+log\s+n\b/g, 'o(log n)')
+      .replace(/\bget\s+input\b/g, 'get and put')
+      .replace(/\bhashmap\b/g, 'hash map')
+      .replace(/\blinkedlist\b/g, 'linked list')
+      .replace(/\bindegree\b/g, 'in-degree')
+      .replace(/\bin\s+degree\b/g, 'in-degree')
+      .replace(/[-_/,:;()]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   /**
    * Scans candidate transcript for technical concepts and moves them to covered.
+   * Normalizes spoken STT variations (e.g. "o of one" -> "o 1", hyphenated phrases)
+   * and evaluates core keyword coverage instead of rigid verbatim sentence matching.
    */
   private detectConcepts(transcript: string, state: OrchestratorState): void {
     if (!transcript || state.remainingConcepts.length === 0) return;
 
-    const lowerTranscript = transcript.toLowerCase();
+    const normalizedTranscript = this.normalizeTechnicalText(transcript);
     const newlyCovered: string[] = [];
 
     for (const concept of state.remainingConcepts) {
-      const lowerConcept = concept.toLowerCase();
-      // Token-boundary or substring check
-      if (lowerTranscript.includes(lowerConcept)) {
+      const normalizedConcept = this.normalizeTechnicalText(concept);
+      if (!normalizedConcept) continue;
+
+      if (normalizedTranscript.includes(normalizedConcept)) {
         newlyCovered.push(concept);
-      } else {
-        // Multi-word fuzzy match: if all significant words are present in transcript
-        const words = lowerConcept.split(/\s+/).filter((w) => w.length > 2);
-        if (
-          words.length > 1 &&
-          words.every((w) => lowerTranscript.includes(w))
-        ) {
-          newlyCovered.push(concept);
-        }
+        continue;
+      }
+
+      const coreWords = Array.from(
+        new Set(
+          normalizedConcept
+            .split(/\s+/)
+            .filter(
+              (w) =>
+                w.length > 2 &&
+                !InterviewOrchestratorService.CONCEPT_STOP_WORDS.has(w),
+            ),
+        ),
+      );
+
+      if (coreWords.length === 0) continue;
+
+      const matchedCount = coreWords.filter((w) =>
+        normalizedTranscript.includes(w),
+      ).length;
+
+      if (coreWords.length <= 2 && matchedCount === coreWords.length) {
+        newlyCovered.push(concept);
+      } else if (
+        coreWords.length >= 3 &&
+        matchedCount >= Math.max(2, Math.ceil(coreWords.length * 0.55))
+      ) {
+        newlyCovered.push(concept);
       }
     }
 
